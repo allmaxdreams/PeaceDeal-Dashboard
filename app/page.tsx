@@ -1,135 +1,119 @@
 import { scenarios } from './lib/data';
 import { supabase } from './lib/supabase';
+import ScenarioChart from './components/ScenarioChart';
 
 export const revalidate = 0;
 
 export default async function Home() {
   
-  // 1. ЗАПИТ ДО БАЗИ ДАНИХ
-  // Сортуємо по created_at, щоб найсвіжіші (щойно додані) були зверху
+  // 1. Беремо всі новини (найсвіжіші зверху)
   const { data: newsList, error } = await supabase
     .from('news')
     .select('*')
     .order('created_at', { ascending: false });
 
-  // 2. МАТЕМАТИКА: Розрахунок живих балів
-  const liveScenarios = scenarios.map(s => ({ ...s }));
+  if (error) console.error("DB Error:", error);
 
-  if (newsList) {
-    newsList.forEach(news => {
-      if (news.scenario_scores) {
-        Object.entries(news.scenario_scores).forEach(([scId, change]) => {
-          const targetScenario = liveScenarios.find(s => s.id === scId);
-          if (targetScenario) {
-            targetScenario.score += Number(change);
-            if (targetScenario.score > 100) targetScenario.score = 100;
-            if (targetScenario.score < 0) targetScenario.score = 0;
-          }
-        });
-      }
-    });
-  }
+  // 2. Математика: Рахуємо бали від початку часів
+  // Нам потрібен хронологічний порядок (від старого до нового) для графіка
+  const chronoNews = [...(newsList || [])].reverse();
+  
+  // Стартові позиції (0%)
+  let currentScores = {
+    peremoha: 0, zamorozhennya: 0, gnyla_ugoda: 0, visnazhennya: 0, chaos_rf: 0, chaos_ua: 0
+  };
+
+  // Будуємо історію крок за кроком
+  const chartData = chronoNews.map(news => {
+    if (news.scenario_scores) {
+      Object.entries(news.scenario_scores).forEach(([key, val]) => {
+        const k = key as keyof typeof currentScores;
+        if (currentScores[k] !== undefined) {
+          currentScores[k] += Number(val);
+          // Обмежуємо 0-100%
+          if (currentScores[k] > 100) currentScores[k] = 100;
+          if (currentScores[k] < 0) currentScores[k] = 0;
+        }
+      });
+    }
+    return { date: news.created_at, ...currentScores };
+  });
+
+  // 3. Оновлюємо картки фінальними цифрами
+  const liveScenarios = scenarios.map(s => ({
+    ...s,
+    score: currentScores[s.id as keyof typeof currentScores] || 0
+  }));
 
   return (
-    <main className="min-h-screen bg-slate-100 p-6 md:p-12">
+    <main className="min-h-screen bg-slate-100 p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
-        <header className="mb-12 text-center">
-          <h1 className="text-5xl md:text-6xl font-extrabold text-slate-900 mb-4 tracking-tight">
-            Geopolitical Dashboard
+        <header className="mb-8 text-center">
+          <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 mb-2">
+            PeaceDeal Dashboard
           </h1>
-          <p className="text-xl md:text-2xl text-slate-600 max-w-2xl mx-auto">
-            Моніторинг ймовірності 6 сценаріїв завершення війни (Модель Пекаря)
-          </p>
-          <div className="mt-4 inline-block bg-white px-4 py-2 rounded-full shadow-sm text-sm font-semibold text-blue-600">
-             Оброблено новин: {newsList?.length || 0}
-          </div>
+          <p className="text-slate-600">AI-аналіз ймовірності сценаріїв завершення війни</p>
         </header>
 
-        {/* SECTION 1: Scenarios Grid (LIVE DATA) */}
-        <section className="mb-16">
-            <h2 className="text-3xl font-bold text-slate-800 mb-6">Поточний прогноз (Live)</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
-            {liveScenarios.map((scenario) => (
-                <div 
-                key={scenario.id} 
-                className={`
-                    flex flex-col justify-between
-                    border-l-8 p-8 rounded-xl shadow-lg bg-white 
-                    transform transition-all duration-300 hover:-translate-y-1 hover:shadow-xl
-                    ${scenario.color.replace('bg-', 'hover:bg-opacity-50 ')}
-                `}
-                >
-                <div>
-                    <div className="flex justify-between items-start mb-6">
-                    <h2 className="text-2xl font-bold text-slate-800 leading-tight">
-                        {scenario.title}
-                    </h2>
-                    <span className="text-4xl font-black text-slate-900">
-                        {scenario.score}%
-                    </span>
-                    </div>
-                    <p className="text-slate-700 text-lg leading-relaxed mb-6">
-                    {scenario.description}
-                    </p>
-                </div>
-                <div>
-                    <div className="w-full bg-gray-200 rounded-full h-4">
-                    <div 
-                        className="bg-slate-800 h-4 rounded-full transition-all duration-1000 ease-out" 
-                        style={{ width: `${scenario.score}%` }}
-                    ></div>
-                    </div>
-                    <p className="text-right text-sm text-slate-400 mt-2 font-medium">
-                        Ймовірність
-                    </p>
-                </div>
-                </div>
-            ))}
+        {/* Секція 1: Картки */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+          {liveScenarios.map((s) => (
+            <div key={s.id} className={`p-6 rounded-xl shadow-sm bg-white border-l-8 ${s.color.replace('bg-', 'hover:bg-opacity-50 ')}`}>
+              <div className="flex justify-between mb-2">
+                <h2 className="font-bold text-slate-800">{s.title}</h2>
+                <span className="text-3xl font-black">{s.score}%</span>
+              </div>
+              <p className="text-sm text-slate-600 mb-4 min-h-[40px]">{s.description}</p>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="bg-slate-800 h-2 rounded-full transition-all duration-1000" style={{ width: `${s.score}%` }}></div>
+              </div>
             </div>
-        </section>
+          ))}
+        </div>
 
-        {/* SECTION 2: News Feed */}
-        <section className="max-w-4xl mx-auto">
-            <h2 className="text-3xl font-bold text-slate-800 mb-6 border-b pb-4">
-                Останні сигнали (Live Database)
-            </h2>
-            <div className="space-y-6">
-                {(!newsList || newsList.length === 0) && (
-                  <p className="text-slate-500 text-center py-10">Новин поки немає. Додайте першу через /admin</p>
-                )}
-                {newsList?.map((news) => {
-                    const affectedScenarios = news.scenario_scores ? Object.keys(news.scenario_scores) : [];
+        {/* Секція 2: Графік */}
+        <div className="mb-8">
+          <ScenarioChart data={chartData} />
+        </div>
+
+        {/* Секція 3: Стрічка */}
+        <h2 className="text-2xl font-bold text-slate-800 mb-4 border-b pb-2">Останні події</h2>
+        <div className="space-y-4">
+          {newsList?.map((news) => {
+             // Показуємо тільки сценарії, де вплив не 0
+             const impacts = news.scenario_scores ? Object.entries(news.scenario_scores).filter(([_, v]) => v !== 0) : [];
+             
+             return (
+              <div key={news.id} className="bg-white p-5 rounded-lg shadow-sm border border-slate-200">
+                <div className="flex items-center gap-2 text-xs text-slate-500 mb-2 uppercase tracking-wide">
+                  <span className="font-bold text-blue-600">{news.source}</span>
+                  <span>•</span>
+                  <span>{new Date(news.created_at).toLocaleString('uk-UA')}</span>
+                </div>
+                <h3 className="text-lg font-bold text-slate-900 mb-2">
+                  <a href={news.url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition">
+                    {news.title}
+                  </a>
+                </h3>
+                <p className="text-slate-700 italic mb-3 bg-slate-50 p-3 rounded border-l-4 border-slate-300">
+                  {news.summary}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {impacts.map(([key, val]) => {
+                    const label = liveScenarios.find(s => s.id === key)?.title || key;
+                    const isPos = Number(val) > 0;
                     return (
-                    <div key={news.id} className="bg-white p-6 rounded-lg shadow-md border border-slate-200">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between mb-3 text-sm text-slate-500">
-                            <div className="flex items-center space-x-3">
-                                <span className="font-bold text-blue-600 uppercase tracking-wider">{news.source}</span>
-                                <span>•</span>
-                                <span>{news.date}</span>
-                            </div>
-                        </div>
-                        <h3 className="text-2xl font-bold text-slate-900 mb-3 hover:text-blue-700 cursor-pointer transition-colors">
-                            {news.title}
-                        </h3>
-                        <div className="bg-slate-50 p-4 rounded-md border-l-4 border-blue-500 mb-4">
-                            <p className="text-slate-700 italic">"{news.summary}"</p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                            {affectedScenarios.map(scId => {
-                                const sc = liveScenarios.find(s => s.id === scId);
-                                const scoreChange = news.scenario_scores[scId];
-                                const isPositive = scoreChange > 0;
-                                return sc ? (
-                                    <span key={scId} className={`px-3 py-1 text-xs font-bold rounded-full border ${isPositive ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
-                                        {sc.title}: {isPositive ? '+' : ''}{scoreChange}
-                                    </span>
-                                ) : null
-                            })}
-                        </div>
-                    </div>
-                )})}
-            </div>
-        </section>
+                      <span key={key} className={`text-xs px-2 py-1 rounded font-bold border ${isPos ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                        {label}: {isPos ? '+' : ''}{val}
+                      </span>
+                    );
+                  })}
+                  {impacts.length === 0 && <span className="text-xs text-slate-400">Без суттєвого впливу</span>}
+                </div>
+              </div>
+             );
+          })}
+        </div>
       </div>
     </main>
   );
