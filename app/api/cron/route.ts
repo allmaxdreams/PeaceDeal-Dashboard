@@ -6,18 +6,36 @@ import { supabase } from '@/app/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
-// 1. ДЖЕРЕЛА (RSS Sources)
-const RSS_SOURCES = [
-  { name: 'Українська Правда', url: 'https://www.pravda.com.ua/rss/view_news/' },
-  { name: 'BBC Україна', url: 'https://feeds.bbci.co.uk/ukrainian/rss.xml' },
-  { name: 'NV (Новое Время)', url: 'https://nv.ua/ukr/rss/all.xml' },
-  { name: 'Цензор.НЕТ', url: 'https://censor.net/includes/news_uk.xml' },
-  { name: 'Ліга.net', url: 'https://news.liga.net/ukr/rss/all.xml' },
-  { name: 'Інтерфакс-Україна', url: 'https://interfax.com.ua/news/last.rss' },
-  { name: 'Радіо Свобода', url: 'https://www.radiosvoboda.org/api/zrqpomqe_q' }
+// 1. КОНФІГУРАЦІЯ ДЖЕРЕЛ
+type SourceType = 'rss' | 'api';
+
+interface NewsSource {
+  name: string;
+  type: SourceType;
+  url: string;
+}
+
+const SOURCES: NewsSource[] = [
+  // --- УКРАЇНСЬКІ (INSIDE VIEW) ---
+  { name: 'Українська Правда', type: 'rss', url: 'https://www.pravda.com.ua/rss/view_news/' },
+  { name: 'BBC Україна', type: 'rss', url: 'https://feeds.bbci.co.uk/ukrainian/rss.xml' },
+  { name: 'NV (Новое Время)', type: 'rss', url: 'https://nv.ua/ukr/rss/all.xml' },
+  { name: 'Цензор.НЕТ', type: 'rss', url: 'https://censor.net/includes/news_uk.xml' },
+  { name: 'Ліга.net', type: 'rss', url: 'https://news.liga.net/ukr/rss/all.xml' },
+  { name: 'Радіо Свобода', type: 'rss', url: 'https://www.radiosvoboda.org/api/zrqpomqe_q' },
+  { name: 'Інтерфакс-Україна', type: 'rss', url: 'https://interfax.com.ua/news/last.rss' },
+
+  // --- ГЛОБАЛЬНІ (OUTSIDE VIEW) ---
+  { name: 'BBC World', type: 'rss', url: 'https://feeds.bbci.co.uk/news/world/rss.xml' },
+  { name: 'CNN World', type: 'rss', url: 'http://rss.cnn.com/rss/edition_world.rss' },
+  { name: 'The Guardian (World)', type: 'rss', url: 'https://www.theguardian.com/world/rss' },
+  { name: 'CNBC International', type: 'rss', url: 'https://www.cnbc.com/id/100727362/device/rss/rss.html' },
+  
+  // --- API (GLOBAL SEARCH INCLUDING BLOOMBERG/REUTERS) ---
+  { name: 'Global NewsAPI', type: 'api', url: 'https://newsapi.org/v2/everything' }
 ];
 
-// 2. ПОВНІ СПИСКИ КЛЮЧОВИХ СЛІВ
+// 2. ПОВНІ СПИСКИ КЛЮЧОВИХ СЛІВ (Smart Dictionary UA+EN)
 
 // Політики та Ключові фігури
 const KW_KEY_FIGURES = [
@@ -81,7 +99,7 @@ const KW_CHAOS_UA = [
 // Загальні військові терміни
 const KW_GENERAL = [
   'зсу', 'afu', 'фронт', 'frontline', 'атака', 'attack', 'вибух', 'explosion',
-  'ракета', 'missile', 'дрон', 'drone', 'шахед', 'shahed'
+  'ракета', 'missile', 'дрон', 'drone', 'шахед', 'shahed', 'ukraine', 'україна'
 ];
 
 // Об'єднуємо ВСЕ для фільтрації
@@ -119,24 +137,69 @@ function isRelevant(text: string): boolean {
   return ALL_RELEVANT_KEYWORDS.some(keyword => lowerText.includes(keyword));
 }
 
+// Функція для отримання новин з NewsAPI
+async function fetchNewsAPIItems() {
+  const apiKey = process.env.NEWS_API_KEY;
+  if (!apiKey) {
+    console.error('NEWS_API_KEY is missing');
+    return [];
+  }
+
+  // Шукаємо новини про Україну англійською та українською
+  const url = `https://newsapi.org/v2/everything?q=Ukraine&language=en&sortBy=publishedAt&pageSize=10&apiKey=${apiKey}`;
+  
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    
+    if (data.status !== 'ok') {
+      console.error('NewsAPI Error:', data.message);
+      return [];
+    }
+
+    return data.articles.map((article: any) => ({
+      title: article.title,
+      link: article.url,
+      contentSnippet: article.description || article.content,
+      sourceName: `NewsAPI (${article.source.name})`
+    }));
+  } catch (error) {
+    console.error('NewsAPI Fetch Error:', error);
+    return [];
+  }
+}
+
 // --- MAIN FUNCTION ---
 export async function GET() {
   try {
-    console.log('🔄 Cron started (Deep Analysis + Full Keywords)...');
-    const shuffledSources = shuffleArray([...RSS_SOURCES]);
+    console.log('🔄 Cron started (Global Sources + Deep Analysis)...');
+    const shuffledSources = shuffleArray([...SOURCES]);
     
     let newsAdded = false;
     let processedTitle = '';
 
     for (const source of shuffledSources) {
       try {
-        const feed = await parser.parseURL(source.url);
-        const latestItems = feed.items.slice(0, 5); 
+        let items: any[] = [];
 
-        for (const item of latestItems) {
+        // Визначаємо тип джерела і тягнемо дані
+        if (source.type === 'rss') {
+          console.log(`📡 Checking RSS: ${source.name}`);
+          const feed = await parser.parseURL(source.url);
+          items = feed.items.slice(0, 5).map(item => ({
+            ...item,
+            sourceName: `${source.name} (RSS)`
+          }));
+        } else if (source.type === 'api') {
+          console.log(`📡 Checking API: ${source.name}`);
+          items = await fetchNewsAPIItems();
+        }
+
+        // Обробка отриманих новин
+        for (const item of items) {
           if (!item.link || !item.title) continue;
 
-          // Фейс-контроль (вже з повним списком слів)
+          // Фейс-контроль
           const fullContentToCheck = `${item.title} ${item.contentSnippet || ''}`;
           if (!isRelevant(fullContentToCheck)) continue;
 
@@ -149,7 +212,7 @@ export async function GET() {
 
           if (existingNews) continue;
 
-          console.log(`⚡ Deep Analyzing: ${item.title}`);
+          console.log(`⚡ Analyzing: ${item.title}`);
 
           // --- ПРОФЕСІЙНИЙ ПРОМПТ (Chain-of-Thought) ---
           const systemPrompt = `
@@ -196,7 +259,7 @@ export async function GET() {
           const completion = await openai.chat.completions.create({
             messages: [
               { role: "system", content: systemPrompt },
-              { role: "user", content: `SOURCE: ${source.name}\nTITLE: ${item.title}\nCONTENT: ${item.contentSnippet}` },
+              { role: "user", content: `SOURCE: ${item.sourceName}\nTITLE: ${item.title}\nCONTENT: ${item.contentSnippet}` },
             ],
             model: "gpt-4o-mini",
             temperature: 0.1, // Strict logic
@@ -208,7 +271,7 @@ export async function GET() {
 
           await supabase.from('news').insert([{
             date: new Date().toISOString(),
-            source: `${source.name} (RSS)`,
+            source: item.sourceName,
             title: item.title,
             url: item.link,
             summary: aiResponse.summary,
