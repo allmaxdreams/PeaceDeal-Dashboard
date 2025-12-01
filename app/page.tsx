@@ -6,14 +6,11 @@ export const revalidate = 0;
 export default async function Home() {
   
   // 1. ЗАПИТ ДО БАЗИ ДАНИХ
+  // Сортуємо по created_at, щоб найсвіжіші (щойно додані) були зверху
   const { data: newsList, error } = await supabase
     .from('news')
     .select('*')
-    .order('date', { ascending: false });
-
-  if (error) {
-    console.error("Помилка завантаження новин:", error);
-  }
+    .order('created_at', { ascending: false });
 
   // 2. МАТЕМАТИКА: Розрахунок живих балів
   const liveScenarios = scenarios.map(s => ({ ...s }));
