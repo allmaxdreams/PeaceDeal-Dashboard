@@ -1,7 +1,7 @@
 // app/api/analyze/route.ts
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import { supabase } from '@/app/lib/supabase'; // Імпортуємо наш клієнт
+import { supabase } from '@/app/lib/supabase';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -15,61 +15,70 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Text is required' }, { status: 400 });
     }
 
-    console.log("Analizing news:", title);
+    console.log("⚡ Analyzing Manual Input:", title);
 
-    // 1. Промпт для AI (Архітектура плагіна з твого ТЗ)
+    // ВДОСКОНАЛЕНИЙ ПРОМПТ (Такий самий, як в автоматизації)
     const systemPrompt = `
-      Ти - експертний геополітичний аналітик. Твоя задача - оцінити вплив новини на 6 сценаріїв завершення війни в Україні (модель Валерія Пекара).
-      
-      Сценарії:
-      1. peremoha (Перемога): Відновлення кордонів 1991, вступ до НАТО/ЄС.
-      2. zamorozhennya (Замороження): Зупинка бойових дій по лінії фронту, конфлікт не вирішено.
-      3. gnyla_ugoda (Гнила угода): Мир на умовах РФ, втрата суверенітету.
-      4. visnazhennya (Війна на виснаження): Тривала війна ресурсів без значних змін фронту.
-      5. chaos_rf (Хаос у РФ): Розпад або зміна режиму в Росії.
-      6. chaos_ua (Хаос в Україні): Економічний/соціальний колапс в Україні.
+      You are a Lead Geopolitical Forecaster using the "Superforecasting" methodology. 
+      Your goal is to perform a probabilistic analysis of news to update the likelihood of 6 war-ending scenarios for Ukraine (Pekar's Model).
 
-      Інструкція:
-      Проаналізуй наданий текст новини. Визнач, наскільки ця подія підсилює або послаблює кожен сценарій.
-      Дай оцінку зміни ймовірності у балах від -100 (робить неможливим) до +100 (гарантує). Більшість новин мають вплив у межах -10...+10.
-      
-      Поверни ТІЛЬКИ JSON об'єкт такого формату:
+      ### METHODOLOGY (Step-by-Step):
+      1. **Filter (Signal vs Noise):** Discard routine statements. Focus on **DIME** factors (Diplomatic agreements, Information shifts, Military actions, Economic changes).
+      2. **Verify Context:** Is "capitulation" historical or current? Is the source quoting a marginal politician or a decision-maker (e.g., Trump/Rubio vs. random MP)?
+      3. **Impact Assessment:** - *High Impact (+20 to +40):* Concrete actions (weapons delivery, laws passed, territory lost/gained).
+         - *Medium Impact (+5 to +15):* Official negotiations, credible drafts of agreements, key appointments.
+         - *Low Impact (+1 to +5):* Public statements, threats, rumors.
+      4. **Mapping:** Assign impact scores to the relevant scenarios.
+
+      ### SCENARIOS:
+      1. **Peremoha:** 1991 borders, NATO/EU, RF demilitarization.
+      2. **Zamorozhennya:** Ceasefire, Korean scenario, status quo.
+      3. **Gnyla Ugoda:** Russian terms, loss of sovereignty, "Finlandization".
+      4. **Visnazhennya:** Long war of resources, stalemate.
+      5. **Chaos RF:** Internal RF collapse, civil war.
+      6. **Chaos UA:** Internal UA collapse, economic default.
+
+      ### OUTPUT FORMAT (JSON):
+      Return ONLY a valid JSON object.
       {
-        "summary": "Коротке пояснення (1 речення) українською, чому це важливо",
+        "summary": "Analytic conclusion in Ukrainian (concise, focus on impact).",
         "scores": {
-          "peremoha": 5,
-          "zamorozhennya": 0,
-          "gnyla_ugoda": -5,
-          "visnazhennya": 10,
-          "chaos_rf": 0,
-          "chaos_ua": 0
+          "peremoha": number,
+          "zamorozhennya": number,
+          "gnyla_ugoda": number,
+          "visnazhennya": number,
+          "chaos_rf": number,
+          "chaos_ua": number
         }
       }
     `;
 
-    // 2. Запит до GPT
+    // Запит до GPT
     const completion = await openai.chat.completions.create({
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: text },
+        { role: "user", content: `Analyze this news:\nTitle: ${title}\nContent: ${text}` },
       ],
-      model: "gpt-4o-mini", // Швидка і дешева модель
+      model: "gpt-4o-mini", 
+      temperature: 0.1, // Строга логіка, мінімум фантазії
       response_format: { type: "json_object" },
     });
 
     const aiResponse = JSON.parse(completion.choices[0].message.content || "{}");
+    
+    // Захист від порожніх балів
+    const safeScores = aiResponse.scores || { peremoha: 0, zamorozhennya: 0, gnyla_ugoda: 0, visnazhennya: 0, chaos_rf: 0, chaos_ua: 0 };
 
-    // 3. Зберігаємо результат в Supabase
+    // Зберігаємо результат в Supabase
     const { data, error } = await supabase
       .from('news')
       .insert([
         {
-          date: date || new Date().toISOString().split('T')[0],
-          source: source || 'AI Input',
+          date: date || new Date().toISOString(),
+          source: source || 'Manual Input',
           title: title || 'Новина без заголовку',
           summary: aiResponse.summary,
-          scenario_scores: aiResponse.scores,
-          // Ми поки не зберігаємо повний текст, щоб економити місце
+          scenario_scores: safeScores,
         }
       ])
       .select();

@@ -4,7 +4,9 @@ import Parser from 'rss-parser';
 import OpenAI from 'openai';
 import { supabase } from '@/app/lib/supabase';
 
-// 1. ДЖЕРЕЛА
+export const dynamic = 'force-dynamic';
+
+// 1. ДЖЕРЕЛА (RSS Sources)
 const RSS_SOURCES = [
   { name: 'Українська Правда', url: 'https://www.pravda.com.ua/rss/view_news/' },
   { name: 'BBC Україна', url: 'https://feeds.bbci.co.uk/ukrainian/rss.xml' },
@@ -15,58 +17,92 @@ const RSS_SOURCES = [
   { name: 'Радіо Свобода', url: 'https://www.radiosvoboda.org/api/zrqpomqe_q' }
 ];
 
-// 2. РОЗУМНІ ФІЛЬТРИ (POSITIVE)
-// Ми розбили їх на групи для зручності, потім об'єднаємо
-const KEYWORDS_WAR = [
-  'війна', 'фронт', 'зсу', 'оборона', 'наступ', 'атака', 'обстріл', 'вибух',
-  'ракета', 'шахед', 'дрони', 'бпла', 'ппо', 'генштаб', 'сирський', 'буданов',
-  'бахмут', 'куп\'янськ', 'авдіївка', 'харків', 'херсон', 'запоріжжя', 'окупаці'
+// 2. ПОВНІ СПИСКИ КЛЮЧОВИХ СЛІВ
+
+// Політики та Ключові фігури
+const KW_KEY_FIGURES = [
+  // Україна
+  'зеленський', 'zelensky', 'єрмак', 'yermak', 'кулеба', 'kuleba', 
+  'сибіга', 'sybiha', 'залужний', 'zaluzhnyi', 'сирський', 'syrskyi',
+  // США
+  'трамп', 'trump', 'байден', 'biden', 'рубіо', 'rubio', 
+  'венс', 'vance', 'хегсет', 'hegseth', 'кушнер', 'kushner',
+  // Європа
+  'макрон', 'macron', 'стармер', 'starmer', 'шольц', 'scholz', 
+  'мерц', 'merz', 'дуда', 'duda', 'орбан', 'orban', 
+  'фон дер ляєн', 'von der leyen', 'рютте', 'rutte',
+  // РФ
+  'путін', 'putin', 'лавров', 'lavrov', 'пєсков', 'peskov'
 ];
 
-const KEYWORDS_DIPLOMACY = [
-  'переговори', 'мир', 'угода', 'формула', 'саміт', 'план', 'гарантії',
-  'зеленський', 'єрмак', 'кулеба', 'сибіга',
-  'байден', 'трамп', 'шольц', 'макрон', 'сунак', 'стармер', 'дуда', 'орбан',
-  'сша', 'нато', 'єс', 'євросоюз', 'g7', 'оон', 'рамштайн', 'пентагон', 'держдеп'
+// Сценарій 1: Перемога (Victory)
+const KW_PEREMOHA = [
+  'кордони 1991', 'borders 1991', 'вступ до нато', 'nato accession', 
+  'вступ до єс', 'eu accession', 'репарації', 'reparations', 
+  'трибунал', 'tribunal', 'демілітаризація', 'demilitarization', 
+  'розпад рф', 'collapse of russia', 'перемога', 'victory', 'звільнення', 'liberation'
 ];
 
-const KEYWORDS_ECONOMY_AID = [
-  'допомога', 'пакет', 'зброя', 'f-16', 'абрамс', 'леопард', 'atacms', 'taurus',
-  'санкції', 'нафта', 'газ', 'бюджет', 'мвф', 'транш', 'кредит', 'економіка',
-  'курс', 'гривня', 'долар', 'експорт', 'зерно', 'блокада', 'конфіскаці'
+// Сценарій 2: Замороження (Freeze)
+const KW_FREEZE = [
+  'припинення вогню', 'ceasefire', 'лінія розмежування', 'contact line', 
+  'корейський сценарій', 'korean scenario', 'замороження конфлікту', 'frozen conflict', 
+  'мінськ-3', 'minsk-3', 'перемир\'я', 'truce', 'статус-кво', 'status quo'
 ];
 
-const KEYWORDS_ENEMY_CHAOS = [
-  'путін', 'рф', 'росія', 'кремль', 'москва', 'бєлгород', 'курск',
-  'рубль', 'центробанк', 'протест', 'бунт', 'мобілізація', 'втрати'
+// Сценарій 3: Гнила угода (Rotten Deal)
+const KW_ROTTEN = [
+  'нейтральний статус', 'neutral status', 'визнання територій', 'recognition of territories', 
+  'відмова від нато', 'nato renunciation', 'фінляндизація', 'finlandization', 
+  'капітуляція', 'capitulation', 'поступки', 'concessions', 'диктат', 'dictate'
 ];
 
-const KEYWORDS_INTERNAL_UA = [
-  'рада', 'кабмін', 'закон', 'корупці', 'скандал', 'хабар', 'суд', 'набу',
-  'енергетика', 'світло', 'блекаут', 'генератор', 'тариф', 'протест', 'тцк'
+// Сценарій 4: Виснаження (Attrition)
+const KW_ATTRITION = [
+  'війна на виснаження', 'war of attrition', 'затяжна війна', 'long war', 
+  'мобілізація', 'mobilization', 'дефіцит бюджету', 'budget deficit', 
+  'біженці', 'refugees', 'снарядний голод', 'shell hunger', 'ресурси', 'resources'
 ];
 
-// Об'єднуємо все в один масив
-const ALL_KEYWORDS = [
-  ...KEYWORDS_WAR, 
-  ...KEYWORDS_DIPLOMACY, 
-  ...KEYWORDS_ECONOMY_AID, 
-  ...KEYWORDS_ENEMY_CHAOS, 
-  ...KEYWORDS_INTERNAL_UA
+// Сценарій 5: Хаос у РФ (Chaos RF)
+const KW_CHAOS_RF = [
+  'падіння рубля', 'ruble collapse', 'громадянська війна', 'civil war', 
+  'бунт', 'riot', 'розпад', 'disintegration', 'партизани', 'partisans', 
+  'бнр', 'bnr', 'смерть путіна', 'putin death', 'переворот', 'coup'
 ];
 
-// 3. МІНУС-СЛОВА (NEGATIVE)
-// Якщо новина містить ці слова - ми її ігноруємо (спорт, погода, гороскопи)
+// Сценарій 6: Хаос в Україні (Chaos UA)
+const KW_CHAOS_UA = [
+  'дефолт', 'default', 'майдан-3', 'maidan-3', 'корупційний скандал', 'corruption scandal', 
+  'протести', 'protests', 'політична криза', 'political crisis', 'розкол', 'schism',
+  'зрада', 'treason', 'економічний колапс', 'economic collapse'
+];
+
+// Загальні військові терміни
+const KW_GENERAL = [
+  'зсу', 'afu', 'фронт', 'frontline', 'атака', 'attack', 'вибух', 'explosion',
+  'ракета', 'missile', 'дрон', 'drone', 'шахед', 'shahed'
+];
+
+// Об'єднуємо ВСЕ для фільтрації
+const ALL_RELEVANT_KEYWORDS = [
+  ...KW_KEY_FIGURES,
+  ...KW_PEREMOHA, ...KW_FREEZE, ...KW_ROTTEN, 
+  ...KW_ATTRITION, ...KW_CHAOS_RF, ...KW_CHAOS_UA, ...KW_GENERAL
+];
+
+// 3. МІНУС-СЛОВА (Negative/Noise)
 const NEGATIVE_KEYWORDS = [
-  'футбол', 'матч', 'ліга чемпіонів', 'динамо', 'шахтар', 'олімпіад',
-  'гороскоп', 'знаки зодіаку', 'прогноз погоди', 'температура повітря',
-  'шоу-бізнес', 'зірка', 'євробачення', 'рецепт', 'дієта', 'схудн', 'мода'
+  'погода', 'weather', 'гороскоп', 'horoscope', 'футбол', 'football', 
+  'концерт', 'concert', 'шоу-бізнес', 'show business', 'рецепт', 'recipe', 
+  'схуднення', 'weight loss', 'знаки зодіаку', 'zodiac', 'мода', 'fashion',
+  'спорт', 'sport', 'матч', 'match', 'ліга чемпіонів', 'champions league'
 ];
 
 const parser = new Parser();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-export const dynamic = 'force-dynamic';
 
+// --- HELPERS ---
 function shuffleArray(array: any[]) {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -75,48 +111,36 @@ function shuffleArray(array: any[]) {
   return array;
 }
 
-// Покращена перевірка
 function isRelevant(text: string): boolean {
   const lowerText = text.toLowerCase();
-  
   // 1. Спочатку перевіряємо на СМІТТЯ
-  if (NEGATIVE_KEYWORDS.some(word => lowerText.includes(word))) {
-    return false;
-  }
-
-  // 2. Потім перевіряємо на ВАЖЛИВЕ
-  return ALL_KEYWORDS.some(keyword => lowerText.includes(keyword));
+  if (NEGATIVE_KEYWORDS.some(word => lowerText.includes(word))) return false;
+  // 2. Потім перевіряємо на ВАЖЛИВЕ (включно з політиками)
+  return ALL_RELEVANT_KEYWORDS.some(keyword => lowerText.includes(keyword));
 }
 
+// --- MAIN FUNCTION ---
 export async function GET() {
   try {
-    console.log('🔄 Cron started (Smart Mode)...');
+    console.log('🔄 Cron started (Deep Analysis + Full Keywords)...');
     const shuffledSources = shuffleArray([...RSS_SOURCES]);
     
     let newsAdded = false;
     let processedTitle = '';
 
     for (const source of shuffledSources) {
-      console.log(`📡 Checking: ${source.name}`);
-      
       try {
         const feed = await parser.parseURL(source.url);
-        // Беремо топ-5 новин для перевірки
-        const latestItems = feed.items.slice(0, 5);
+        const latestItems = feed.items.slice(0, 5); 
 
         for (const item of latestItems) {
           if (!item.link || !item.title) continue;
 
-          // ФЕЙС-КОНТРОЛЬ
+          // Фейс-контроль (вже з повним списком слів)
           const fullContentToCheck = `${item.title} ${item.contentSnippet || ''}`;
-          
-          if (!isRelevant(fullContentToCheck)) {
-            // console.log(`Skipped (irrelevant): ${item.title}`); 
-            // Закоментував, щоб не засмічувати логи
-            continue;
-          }
+          if (!isRelevant(fullContentToCheck)) continue;
 
-          // ПЕРЕВІРКА НА ДУБЛІКАТ
+          // Перевірка на дублікат
           const { data: existingNews } = await supabase
             .from('news')
             .select('id')
@@ -125,70 +149,85 @@ export async function GET() {
 
           if (existingNews) continue;
 
-          // --- ЗНАЙШЛИ! ---
-          console.log(`⚡ Analyzing Smart News: ${item.title}`);
+          console.log(`⚡ Deep Analyzing: ${item.title}`);
 
+          // --- ПРОФЕСІЙНИЙ ПРОМПТ (Chain-of-Thought) ---
           const systemPrompt = `
-            Ти - провідний геополітичний аналітик. Твоя мета - оцінити вплив події на 6 сценаріїв завершення війни в Україні (модель Пекара).
-            
-            Сценарії: 
-            1. peremoha (Перемога): кордони 1991, НАТО, роззброєння РФ.
-            2. zamorozhennya (Замороження): припинення вогню, лінія розмежування.
-            3. gnyla_ugoda (Гнила угода): поступки суверенітетом, диктат РФ.
-            4. visnazhennya (Виснаження): довга війна ресурсів.
-            5. chaos_rf (Хаос в РФ): бунти, економічний крах, зміна влади в Москві.
-            6. chaos_ua (Хаос в Україні): економічний колапс, внутрішній розкол.
-            
-            Оціни вплив у балах від -100 до +100.
-            Будь критичним. Не всі новини мають великий вплив. Звичайна заява політика = 1-5 балів. Реальна дія (зброя, закон) = 10-20 балів. Прорив фронту = 30+ балів.
-            
-            Поверни ТІЛЬКИ JSON:
+            You are a Lead Geopolitical Forecaster using the "Superforecasting" methodology. 
+            Your goal is to perform a probabilistic analysis of news to update the likelihood of 6 war-ending scenarios for Ukraine (Pekar's Model).
+
+            ### METHODOLOGY (Step-by-Step):
+            1. **Filter (Signal vs Noise):** Discard routine statements. Focus on **DIME** factors (Diplomatic agreements, Information shifts, Military actions, Economic changes).
+            2. **Verify Context:** Is "capitulation" historical or current? Is the source quoting a marginal politician or a decision-maker (e.g., Trump/Rubio vs. random MP)?
+            3. **Impact Assessment:** - *High Impact (+20 to +40):* Concrete actions (weapons delivery, laws passed, territory lost/gained).
+               - *Medium Impact (+5 to +15):* Official negotiations, credible drafts of agreements, key appointments (e.g. Waltz/Rubio).
+               - *Low Impact (+1 to +5):* Public statements, threats, rumors.
+            4. **Mapping:** Assign impact scores to the relevant scenarios.
+
+            ### SCENARIOS:
+            1. **Peremoha:** 1991 borders, NATO/EU, RF demilitarization.
+            2. **Zamorozhennya:** Ceasefire, Korean scenario, status quo.
+            3. **Gnyla Ugoda:** Russian terms, loss of sovereignty, "Finlandization".
+            4. **Visnazhennya:** Long war of resources, stalemate.
+            5. **Chaos RF:** Internal RF collapse, civil war.
+            6. **Chaos UA:** Internal UA collapse, economic default.
+
+            ### KEY ENTITIES RULES:
+            - **Trump/Vance/Rubio:** If they speak about "stopping the war quickly" -> increases *Zamorozhennya* OR *Gnyla Ugoda* (depending on terms).
+            - **Putin/Lavrov:** Threats usually increase *Visnazhennya* or *Gnyla Ugoda*.
+            - **Zelensky/Yermak:** Calls for weapons -> *Peremoha* or *Visnazhennya*.
+            - **Aid Packages:** Always increase *Peremoha* and decrease *Gnyla Ugoda*.
+
+            ### OUTPUT FORMAT (JSON):
+            Return ONLY a valid JSON object.
             {
-              "summary": "Стислий аналітичний висновок (1 речення) українською",
-              "scores": { "peremoha": 0, "zamorozhennya": 0, "gnyla_ugoda": 0, "visnazhennya": 0, "chaos_rf": 0, "chaos_ua": 0 }
+              "summary": "Analytic conclusion in Ukrainian (concise, focus on impact).",
+              "scores": {
+                "peremoha": number,
+                "zamorozhennya": number,
+                "gnyla_ugoda": number,
+                "visnazhennya": number,
+                "chaos_rf": number,
+                "chaos_ua": number
+              }
             }
           `;
 
           const completion = await openai.chat.completions.create({
             messages: [
               { role: "system", content: systemPrompt },
-              { role: "user", content: `Заголовок: ${item.title}\nТекст: ${item.contentSnippet}` },
+              { role: "user", content: `SOURCE: ${source.name}\nTITLE: ${item.title}\nCONTENT: ${item.contentSnippet}` },
             ],
             model: "gpt-4o-mini",
+            temperature: 0.1, // Strict logic
             response_format: { type: "json_object" },
           });
 
           const aiResponse = JSON.parse(completion.choices[0].message.content || "{}");
+          const safeScores = aiResponse.scores || { peremoha: 0, zamorozhennya: 0, gnyla_ugoda: 0, visnazhennya: 0, chaos_rf: 0, chaos_ua: 0 };
 
-          // Зберігаємо
           await supabase.from('news').insert([{
             date: new Date().toISOString(),
             source: `${source.name} (RSS)`,
             title: item.title,
             url: item.link,
             summary: aiResponse.summary,
-            scenario_scores: aiResponse.scores,
+            scenario_scores: safeScores,
           }]);
 
           newsAdded = true;
           processedTitle = item.title;
-          break; // Зупиняємося після однієї успішної новини
+          break; 
         }
 
-        if (newsAdded) break; 
-
+        if (newsAdded) break;
       } catch (err) {
-        console.error(`Error with ${source.name}:`, err);
+        console.error(`Source Error (${source.name}):`, err);
         continue;
       }
     }
 
-    return NextResponse.json({ 
-      success: newsAdded, 
-      message: newsAdded ? 'Smart news added' : 'No relevant news found',
-      title: processedTitle 
-    });
-
+    return NextResponse.json({ success: newsAdded, title: processedTitle });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
