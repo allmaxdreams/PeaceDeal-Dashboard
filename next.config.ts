@@ -1,13 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Ігноруємо помилки TypeScript під час збірки (найчастіша причина збоїв)
+  // Ігноруємо помилки TypeScript (це працює в v16)
   typescript: {
     ignoreBuildErrors: true,
-  },
-  // Ігноруємо помилки стилю коду (ESLint)
-  eslint: {
-    ignoreDuringBuilds: true,
   },
 };
 
