@@ -6,7 +6,7 @@ export const revalidate = 0;
 
 export default async function Home() {
   
-  // 1. Беремо всі новини (найсвіжіші зверху)
+  // 1. Беремо всі новини
   const { data: newsList, error } = await supabase
     .from('news')
     .select('*')
@@ -14,17 +14,28 @@ export default async function Home() {
 
   if (error) console.error("DB Error:", error);
 
-  // 2. Математика: Рахуємо бали від початку часів
-  // Нам потрібен хронологічний порядок (від старого до нового) для графіка
+  // 2. Підготовка даних для графіка
   const chronoNews = [...(newsList || [])].reverse();
   
-  // Стартові позиції (0%)
+  // Початкові бали
   let currentScores = {
-    peremoha: 0, zamorozhennya: 0, gnyla_ugoda: 0, visnazhennya: 0, chaos_rf: 0, chaos_ua: 0
+    peremoha: 0, zamorozhennya: 0, gnyla_ugoda: 0, 
+    visnazhennya: 0, chaos_rf: 0, chaos_ua: 0
   };
 
-  // Будуємо історію крок за кроком
-  const chartData = chronoNews.map(news => {
+  // --- ВАЖЛИВО: Створюємо стартову точку (Нульовий кілометр) ---
+  // Беремо дату першої новини і віднімаємо 1 день, або просто ставимо "Start"
+  const startDate = chronoNews.length > 0 
+    ? new Date(new Date(chronoNews[0].created_at).getTime() - 86400000).toISOString() 
+    : new Date().toISOString();
+
+  // Масив починається з нулів
+  const chartData = [
+    { date: startDate, ...currentScores } 
+  ];
+
+  // Наповнюємо даними
+  chronoNews.forEach(news => {
     if (news.scenario_scores) {
       Object.entries(news.scenario_scores).forEach(([key, val]) => {
         const k = key as keyof typeof currentScores;
@@ -36,10 +47,11 @@ export default async function Home() {
         }
       });
     }
-    return { date: news.created_at, ...currentScores };
+    // Додаємо нову точку після зміни
+    chartData.push({ date: news.created_at, ...currentScores });
   });
 
-  // 3. Оновлюємо картки фінальними цифрами
+  // 3. Оновлюємо картки
   const liveScenarios = scenarios.map(s => ({
     ...s,
     score: currentScores[s.id as keyof typeof currentScores] || 0
@@ -53,6 +65,9 @@ export default async function Home() {
             PeaceDeal Dashboard
           </h1>
           <p className="text-slate-600">AI-аналіз ймовірності сценаріїв завершення війни</p>
+          <div className="mt-4 inline-block bg-white px-4 py-2 rounded-full shadow-sm text-sm font-semibold text-blue-600">
+             Оброблено подій: {newsList?.length || 0}
+          </div>
         </header>
 
         {/* Секція 1: Картки */}
@@ -80,7 +95,6 @@ export default async function Home() {
         <h2 className="text-2xl font-bold text-slate-800 mb-4 border-b pb-2">Останні події</h2>
         <div className="space-y-4">
           {newsList?.map((news) => {
-             // Показуємо тільки сценарії, де вплив не 0
              const impacts = news.scenario_scores ? Object.entries(news.scenario_scores).filter(([_, v]) => v !== 0) : [];
              
              return (
@@ -108,7 +122,7 @@ export default async function Home() {
                       </span>
                     );
                   })}
-                  {impacts.length === 0 && <span className="text-xs text-slate-400">Без суттєвого впливу</span>}
+                  {impacts.length === 0 && <span className="text-xs text-slate-400">Вплив оцінено як нейтральний</span>}
                 </div>
               </div>
              );
