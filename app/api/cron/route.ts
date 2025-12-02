@@ -1,3 +1,4 @@
+// app/api/cron/route.ts
 import { NextResponse } from 'next/server';
 import Parser from 'rss-parser';
 import OpenAI from 'openai';
@@ -6,7 +7,7 @@ import { supabase } from '@/app/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
-// 1. ДЖЕРЕЛА (RSS Sources + Weights)
+// 1. ДЖЕРЕЛА + ВАГИ (SOURCES)
 interface NewsSource {
   name: string;
   type: 'rss' | 'api';
@@ -60,7 +61,7 @@ const KW_PEREMOHA = [
 ];
 
 const KW_FREEZE = [
-  // CSV Import (Rotten Deal section in CSV matches Freeze logic)
+  // CSV Import
   'заморожений конфлікт', 'frozen conflict', 'припинення вогню', 'ceasefire',
   'обмежений суверенітет', 'limited sovereignty', 'відмова від нато', 'nato rejection',
   'стратегічне терпіння', 'strategic patience', 'євроскептицизм', 'euroscepticism',
@@ -71,7 +72,7 @@ const KW_FREEZE = [
 ];
 
 const KW_ROTTEN = [
-  // CSV Import (Defeat + Global DNR sections)
+  // CSV Import
   'капітуляція', 'surrender', 'маріонетковий уряд', 'puppet government',
   'уряд в екзилі', 'government in exile', 'втрата суверенітету', 'loss of sovereignty',
   'русифікація', 'russification', 'гіперінфляція', 'hyperinflation',
@@ -85,7 +86,7 @@ const KW_ROTTEN = [
 ];
 
 const KW_ATTRITION = [
-  // CSV Import (Bees vs Bear)
+  // CSV Import
   'ізраїльський сценарій', 'israeli scenario', 'оборонні інновації', 'defense innovation',
   'захист суверенітету', 'sovereignty protection', 'оборонний експорт', 'defense export',
   'технологічна перевага', 'technological advantage',
@@ -99,14 +100,14 @@ const KW_ATTRITION = [
 ];
 
 const KW_CHAOS_RF = [
-  // Old List (CSV didn't have specific RF Chaos section, kept old + logic)
+  // Old List
   'падіння рубля', 'ruble collapse', 'громадянська війна', 'civil war', 
   'бунт', 'riot', 'розпад', 'disintegration', 'партизани', 'partisans', 
   'бнр', 'bnr', 'смерть путіна', 'putin death', 'переворот', 'coup'
 ];
 
 const KW_CHAOS_UA = [
-  // CSV Import (Unstable Equilibrium)
+  // CSV Import
   'хунта', 'junta', 'авторитаризм', 'authoritarianism',
   'тінізація економіки', 'shadow economy', 'прихована окупація', 'hidden occupation',
   'депопуляція', 'depopulation',
@@ -117,7 +118,7 @@ const KW_CHAOS_UA = [
 ];
 
 const KW_GENERAL = [
-  // CSV Import (Universal)
+  // CSV Import
   'нато', 'nato', 'єс', 'eu', 'біженці', 'refugees', 'корупція', 'corruption', 'відбудова', 'reconstruction',
   // Old List
   'зсу', 'afu', 'фронт', 'frontline', 'атака', 'attack', 'вибух', 'explosion',
@@ -142,11 +143,11 @@ const NEGATIVE_KEYWORDS = [
 const parser = new Parser();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// --- FULL TEXT PARSER ---
+// --- FULL TEXT PARSER (Cheerio) ---
 async function fetchArticleContent(url: string): Promise<string> {
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 sec timeout
+    const timeoutId = setTimeout(() => controller.abort(), 5000); 
 
     const res = await fetch(url, { 
       signal: controller.signal,
@@ -165,6 +166,8 @@ async function fetchArticleContent(url: string): Promise<string> {
     // Шукаємо основний текст
     let text = $('article').text() || $('.post-content').text() || $('main').text() || $('body').text();
     text = text.replace(/\s+/g, ' ').trim();
+    
+    // Обмежуємо довжину для OpenAI
     return text.slice(0, 4000);
   } catch (error) {
     console.error(`Scraping error for ${url}:`, error);
@@ -221,12 +224,12 @@ async function fetchRSS(source: NewsSource) {
 // --- MAIN CRON HANDLER ---
 export async function GET() {
   try {
-    console.log('🔄 Cron started (Full-Text + CSV Keywords + Multi-Agent)...');
+    console.log('🔄 Cron started (Full-Text + Weights + Multi-Agent)...');
     
-    // 1. ЗБІР
-    const tasks = [...RSS_SOURCES.map(source => fetchRSS(source)), fetchNewsAPIItems()];
+    // 1. ЗБІР (Parallel Execution)
+    const tasks = [...SOURCES.map(source => fetchRSS(source)), fetchNewsAPIItems()];
     const results = await Promise.all(tasks);
-    const allNews = results.flat();
+    const allNews = results.flat().filter(item => item && item.title);
 
     // 2. СОРТУВАННЯ
     const sortedNews = allNews
@@ -251,7 +254,6 @@ export async function GET() {
       
       if (!fullText || fullText.length < 200) {
         fullText = item.contentSnippet || item.title;
-        console.log('⚠️ Scraping failed, using snippet.');
       }
 
       if (!isRelevant(fullText)) {
@@ -265,13 +267,7 @@ export async function GET() {
         Analyze the provided FULL TEXT of the article.
         
         METHODOLOGY: DIME (Diplomatic, Info, Military, Economic).
-        SCENARIOS (Pekar's Model): 
-        1. Peremoha (Victory/EU/NATO)
-        2. Zamorozhennya (Freeze/Ceasefire)
-        3. Gnyla Ugoda (Rotten Deal/Capitulation)
-        4. Visnazhennya (Attrition/Israel Model)
-        5. Chaos RF (RF Collapse/Coup)
-        6. Chaos UA (Junta/Collapse)
+        SCENARIOS: Peremoha, Zamorozhennya, Gnyla Ugoda, Visnazhennya, Chaos RF, Chaos UA.
 
         AGENTS:
         1. Skeptic: Filters noise/propaganda.
