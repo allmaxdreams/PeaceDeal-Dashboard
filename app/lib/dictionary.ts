@@ -12,7 +12,7 @@ export const dictionary = {
     neutral: "НЕЙТРАЛЬНИЙ ВПЛИВ",
     methodologyBtn: "[ ПРО ПРОЄКТ ]",
     methodologyTitle: "ПРО ПРОЄКТ",
-    devLogBtn: "ІСТОРІЯ ЗМІН", // Нова кнопка
+    devLogBtn: "ІСТОРІЯ ЗМІН", // <-- Ось кнопка
     devLogTitle: "DEV LOG // SYSTEM UPDATES",
     ackButton: "ЗРОЗУМІЛО",
     footer: "Розроблено",
@@ -35,7 +35,6 @@ export const dictionary = {
       p3_title: "3. Джерела",
       p3_text: "Агрегація даних з верифікованих джерел (ЗМІ, офіційні канали, міжнародні агентства)."
     },
-    // НОВИЙ РОЗДІЛ: ЛОГ РОЗРОБКИ
     devlog: [
       {
         version: "v2.2",
