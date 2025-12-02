@@ -10,12 +10,12 @@ type ChartProps = {
 };
 
 const COLORS = {
-  peremoha: '#4ade80',
-  zamorozhennya: '#3b82f6',
-  gnyla_ugoda: '#facc15',
-  visnazhennya: '#94a3b8',
-  chaos_rf: '#f87171',
-  chaos_ua: '#fb923c',
+  peremoha: '#4ade80',      // Яскраво-зелений
+  zamorozhennya: '#3b82f6', // Яскраво-синій
+  gnyla_ugoda: '#facc15',   // Жовтий
+  visnazhennya: '#94a3b8',  // Світло-сірий
+  chaos_rf: '#f87171',      // Червоний
+  chaos_ua: '#fb923c',      // Помаранчевий
 };
 
 const NAMES = {
@@ -96,14 +96,15 @@ export default function ScenarioChart({ data }: ChartProps) {
             {Object.entries(COLORS).map(([key, color]) => (
               <Line
                 key={key}
-                type="stepAfter" // Технічний стиль ліній
+                type="monotone" // <--- ЦЕ РОБИТЬ ЛІНІЇ ПЛАВНИМИ
                 dataKey={key}
                 name={NAMES[key as keyof typeof NAMES]}
                 stroke={color}
-                strokeWidth={1.5}
+                strokeWidth={2} // Трохи товстіша лінія для кращого вигляду
                 dot={false}
-                activeDot={{ r: 3, stroke: '#fff', strokeWidth: 1 }}
-                isAnimationActive={false}
+                activeDot={{ r: 4, stroke: '#fff', strokeWidth: 1 }}
+                isAnimationActive={true} // Увімкнув плавну анімацію при завантаженні
+                animationDuration={1500}
               />
             ))}
           </LineChart>
