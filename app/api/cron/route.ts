@@ -7,17 +7,10 @@ import { supabase } from '@/app/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
-// --- 1. ДЖЕРЕЛА + ВАГИ (SOURCES) ---
-interface NewsSource {
-  name: string;
-  type: 'rss' | 'api';
-  url: string;
-  weight: number; 
-}
-
-const SOURCES: NewsSource[] = [
-  // --- UKRAINE ---
-  { name: 'Українська Правда', type: 'rss', url: 'https://www.pravda.com.ua/rss/view_news/', weight: 0.9 },
+// 1. ДЖЕРЕЛА
+const SOURCES: any[] = [
+  // UKRAINE
+  { name: 'УП', type: 'rss', url: 'https://www.pravda.com.ua/rss/view_news/', weight: 0.9 },
   { name: 'BBC UA', type: 'rss', url: 'https://feeds.bbci.co.uk/ukrainian/rss.xml', weight: 1.0 },
   { name: 'NV', type: 'rss', url: 'https://nv.ua/ukr/rss/all.xml', weight: 0.8 },
   { name: 'Цензор', type: 'rss', url: 'https://censor.net/includes/news_uk.xml', weight: 0.7 },
@@ -26,7 +19,7 @@ const SOURCES: NewsSource[] = [
   { name: 'Радіо Свобода', type: 'rss', url: 'https://www.radiosvoboda.org/api/zrqpomqe_q', weight: 0.9 },
   { name: 'Економічна Правда', type: 'rss', url: 'https://www.epravda.com.ua/rss/news/', weight: 0.9 },
   
-  // --- GLOBAL ---
+  // GLOBAL
   { name: 'BBC World', type: 'rss', url: 'https://feeds.bbci.co.uk/news/world/rss.xml', weight: 1.0 },
   { name: 'CNN World', type: 'rss', url: 'http://rss.cnn.com/rss/edition_world.rss', weight: 1.0 },
   { name: 'The Guardian', type: 'rss', url: 'https://www.theguardian.com/world/rss', weight: 1.0 },
@@ -34,112 +27,46 @@ const SOURCES: NewsSource[] = [
   { name: 'Global NewsAPI', type: 'api', url: 'https://newsapi.org/v2/everything', weight: 0.8 }
 ];
 
-// --- 2. ПОВНІ СЛОВНИКИ (MERGED: OLD + CSV) ---
-
-const KW_KEY_FIGURES = [
-  'зеленський', 'zelensky', 'єрмак', 'yermak', 'кулеба', 'kuleba', 
-  'сибіга', 'sybiha', 'залужний', 'zaluzhnyi', 'сирський', 'syrskyi',
-  'трамп', 'trump', 'байден', 'biden', 'рубіо', 'rubio', 
-  'венс', 'vance', 'хегсет', 'hegseth', 'кушнер', 'kushner',
-  'макрон', 'macron', 'стармер', 'starmer', 'шольц', 'scholz', 
-  'мерц', 'merz', 'дуда', 'duda', 'орбан', 'orban', 
-  'фон дер ляєн', 'von der leyen', 'рютте', 'rutte',
-  'путін', 'putin', 'лавров', 'lavrov', 'пєсков', 'peskov'
+// --- НОВЕ: ОБОВ'ЯЗКОВИЙ КОНТЕКСТ (ANCHORS) ---
+// Новина МУСИТЬ містити хоча б одне з цих слів, інакше ми її ігноруємо,
+// навіть якщо там є слово "війна" або "переворот".
+const REQUIRED_CONTEXT = [
+  'ukraine', 'ukrainian', 'україна', 'українськ', 'kyiv', 'kiev', 'київ',
+  'russia', 'russian', 'росія', 'російськ', 'рф', 'moscow', 'kremlin', 'кремль', 'москва',
+  'putin', 'путін', 'zelensky', 'зеленський', 'zsu', 'зсу', 'afu',
+  'nato', 'нато', 'eu ', 'єс ', 'usa ', 'сша ', 'un ', 'оон ' // пробіли щоб не ловити 'virus' як 'us'
 ];
 
-const KW_PEREMOHA = [
-  // CSV Import
-  'деокупація', 'deoccupation', 'членство в нато', 'nato membership',
-  'членство в єс', 'eu membership', 'звільнення територій', 'territory liberation',
-  'повернення біженців', 'refugee returns', 'гарантії безпеки', 'security guarantees',
-  'іноземні інвестиції', 'foreign direct investment',
-  // Old List
-  'кордони 1991', 'borders 1991', 'вступ до нато', 'nato accession', 
-  'вступ до єс', 'eu accession', 'репарації', 'reparations', 
-  'трибунал', 'tribunal', 'демілітаризація', 'demilitarization', 
-  'розпад рф', 'collapse of russia', 'перемога', 'victory', 'звільнення', 'liberation'
-];
+// 2. СЛОВНИКИ ТЕМАТИЧНІ
+const KW_KEY_FIGURES = ['зеленський', 'zelensky', 'єрмак', 'yermak', 'кулеба', 'kuleba', 'сибіга', 'sybiha', 'залужний', 'zaluzhnyi', 'сирський', 'syrskyi', 'трамп', 'trump', 'байден', 'biden', 'рубіо', 'rubio', 'венс', 'vance', 'хегсет', 'hegseth', 'кушнер', 'kushner', 'макрон', 'macron', 'стармер', 'starmer', 'шольц', 'scholz', 'мерц', 'merz', 'дуда', 'duda', 'орбан', 'orban', 'фон дер ляєн', 'von der leyen', 'рютте', 'rutte', 'путін', 'putin', 'лавров', 'lavrov', 'пєсков', 'peskov'];
+const KW_PEREMOHA = ['кордони 1991', 'borders 1991', 'вступ до нато', 'nato accession', 'вступ до єс', 'eu accession', 'репарації', 'reparations', 'трибунал', 'tribunal', 'демілітаризація', 'demilitarization', 'розпад рф', 'collapse of russia', 'перемога', 'victory', 'звільнення', 'liberation'];
+const KW_FREEZE = ['припинення вогню', 'ceasefire', 'лінія розмежування', 'contact line', 'корейський сценарій', 'korean scenario', 'замороження конфлікту', 'frozen conflict', 'мінськ-3', 'minsk-3', 'перемир\'я', 'truce', 'статус-кво', 'status quo'];
+const KW_ROTTEN = ['нейтральний статус', 'neutral status', 'визнання територій', 'recognition of territories', 'відмова від нато', 'nato renunciation', 'фінляндизація', 'finlandization', 'капітуляція', 'capitulation', 'поступки', 'concessions', 'диктат', 'dictate'];
+const KW_ATTRITION = ['війна на виснаження', 'war of attrition', 'затяжна війна', 'long war', 'мобілізація', 'mobilization', 'дефіцит бюджету', 'budget deficit', 'біженці', 'refugees', 'снарядний голод', 'shell hunger', 'ресурси', 'resources', 'бюджет', 'податки', 'пдв', 'економіка рф', 'рубль', 'дефіцит', 'витрати на війну', 'військовий збір', 'санкції', 'нафта', 'газ', 'ввп', 'центробанк', 'нацбанк', 'курс', 'долар'];
+const KW_CHAOS_RF = ['падіння рубля', 'ruble collapse', 'громадянська війна', 'civil war', 'бунт', 'riot', 'розпад', 'disintegration', 'партизани', 'partisans', 'бнр', 'bnr', 'смерть путіна', 'putin death', 'переворот', 'coup'];
+const KW_CHAOS_UA = ['дефолт', 'default', 'майдан-3', 'maidan-3', 'корупційний скандал', 'corruption scandal', 'протести', 'protests', 'політична криза', 'political crisis', 'розкол', 'schism', 'зрада', 'treason', 'економічний колапс', 'economic collapse'];
+const KW_GENERAL = ['зсу', 'afu', 'фронт', 'frontline', 'атака', 'attack', 'вибух', 'explosion', 'ракета', 'missile', 'дрон', 'drone', 'шахед', 'shahed', 'ukraine', 'україна'];
 
-const KW_FREEZE = [
-  // CSV Import
-  'заморожений конфлікт', 'frozen conflict', 'припинення вогню', 'ceasefire',
-  'обмежений суверенітет', 'limited sovereignty', 'відмова від нато', 'nato rejection',
-  'стратегічне терпіння', 'strategic patience', 'євроскептицизм', 'euroscepticism',
-  // Old List
-  'припинення вогню', 'ceasefire', 'лінія розмежування', 'contact line', 
-  'корейський сценарій', 'korean scenario', 'замороження конфлікту', 'frozen conflict', 
-  'мінськ-3', 'minsk-3', 'перемир\'я', 'truce', 'статус-кво', 'status quo'
-];
-
-const KW_ROTTEN = [
-  // CSV Import
-  'капітуляція', 'surrender', 'маріонетковий уряд', 'puppet government',
-  'уряд в екзилі', 'government in exile', 'втрата суверенітету', 'loss of sovereignty',
-  'русифікація', 'russification', 'гіперінфляція', 'hyperinflation',
-  'де-факто окупація', 'de facto occupation', 'невизнана анексія', 'unrecognized annexation',
-  'партизанський рух', 'partisan movement', 'пвк', 'pmcs',
-  'демографічна катастрофа', 'demographic catastrophe',
-  // Old List
-  'нейтральний статус', 'neutral status', 'визнання територій', 'recognition of territories', 
-  'відмова від нато', 'nato renunciation', 'фінляндизація', 'finlandization', 
-  'капітуляція', 'capitulation', 'поступки', 'concessions', 'диктат', 'dictate'
-];
-
-const KW_ATTRITION = [
-  // CSV Import
-  'ізраїльський сценарій', 'israeli scenario', 'оборонні інновації', 'defense innovation',
-  'захист суверенітету', 'sovereignty protection', 'оборонний експорт', 'defense export',
-  'технологічна перевага', 'technological advantage',
-  // Old List + Economy
-  'війна на виснаження', 'war of attrition', 'затяжна війна', 'long war', 
-  'мобілізація', 'mobilization', 'дефіцит бюджету', 'budget deficit', 
-  'біженці', 'refugees', 'снарядний голод', 'shell hunger', 'ресурси', 'resources',
-  'бюджет', 'податки', 'пдв', 'економіка рф', 'рубль', 'дефіцит', 
-  'витрати на війну', 'військовий збір', 'санкції', 'нафта', 'газ', 
-  'ввп', 'центробанк', 'нацбанк', 'курс', 'долар', 'export', 'grain'
-];
-
-const KW_CHAOS_RF = [
-  'падіння рубля', 'ruble collapse', 'громадянська війна', 'civil war', 
-  'бунт', 'riot', 'розпад', 'disintegration', 'партизани', 'partisans', 
-  'бнр', 'bnr', 'смерть путіна', 'putin death', 'переворот', 'coup'
-];
-
-const KW_CHAOS_UA = [
-  'дефолт', 'default', 'майдан-3', 'maidan-3', 'корупційний скандал', 'corruption scandal', 
-  'протести', 'protests', 'політична криза', 'political crisis', 'розкол', 'schism',
-  'зрада', 'treason', 'економічний колапс', 'economic collapse'
-];
-
-const KW_GENERAL = [
-  'зсу', 'afu', 'фронт', 'frontline', 'атака', 'attack', 'вибух', 'explosion',
-  'ракета', 'missile', 'дрон', 'drone', 'шахед', 'shahed', 'ukraine', 'україна'
-];
-
-// Об'єднуємо ВСЕ для фільтрації
-const ALL_RELEVANT_KEYWORDS = [
-  ...KW_KEY_FIGURES,
-  ...KW_PEREMOHA, ...KW_FREEZE, ...KW_ROTTEN, 
-  ...KW_ATTRITION, ...KW_CHAOS_RF, ...KW_CHAOS_UA, ...KW_GENERAL
-];
-
-// 3. МІНУС-СЛОВА
-const NEGATIVE_KEYWORDS = [
-  'погода', 'weather', 'гороскоп', 'horoscope', 'футбол', 'football', 
-  'концерт', 'concert', 'шоу-бізнес', 'show business', 'рецепт', 'recipe', 
-  'схуднення', 'weight loss', 'знаки зодіаку', 'zodiac', 'мода', 'fashion',
-  'спорт', 'sport', 'матч', 'match', 'ліга чемпіонів', 'champions league'
-];
+const ALL_RELEVANT_KEYWORDS = [...KW_KEY_FIGURES, ...KW_PEREMOHA, ...KW_FREEZE, ...KW_ROTTEN, ...KW_ATTRITION, ...KW_CHAOS_RF, ...KW_CHAOS_UA, ...KW_GENERAL];
+const NEGATIVE_KEYWORDS = ['погода', 'weather', 'гороскоп', 'horoscope', 'футбол', 'football', 'концерт', 'concert', 'шоу-бізнес', 'show business', 'рецепт', 'recipe', 'схуднення', 'weight loss', 'знаки зодіаку', 'zodiac', 'мода', 'fashion', 'спорт', 'sport', 'матч', 'match', 'ліга чемпіонів', 'champions league', 'africa', 'nigeria', 'sudan', 'gaza', 'israel', 'syria']; // Додав Африку і Газу в мінус
 
 const parser = new Parser();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // --- HELPERS ---
-
-function isRelevant(text: string): boolean {
-  const lowerText = text.toLowerCase();
-  if (NEGATIVE_KEYWORDS.some(word => lowerText.includes(word))) return false;
-  return ALL_RELEVANT_KEYWORDS.some(keyword => lowerText.includes(keyword));
+function getSimilarity(str1: string, str2: string): number {
+  if (!str1 || !str2) return 0;
+  const s1 = str1.toLowerCase().replace(/[^\w\sа-яіїєґ]/g, '');
+  const s2 = str2.toLowerCase().replace(/[^\w\sа-яіїєґ]/g, '');
+  if (s1 === s2) return 1;
+  if (s1.length < 2 || s2.length < 2) return 0;
+  const bigrams1 = new Set();
+  for (let i = 0; i < s1.length - 1; i++) bigrams1.add(s1.substring(i, i + 2));
+  const bigrams2 = new Set();
+  for (let i = 0; i < s2.length - 1; i++) bigrams2.add(s2.substring(i, i + 2));
+  let intersection = 0;
+  bigrams1.forEach(item => { if (bigrams2.has(item)) intersection++; });
+  return (2.0 * intersection) / (bigrams1.size + bigrams2.size);
 }
 
 function shuffleArray(array: any[]) {
@@ -150,36 +77,41 @@ function shuffleArray(array: any[]) {
   return array;
 }
 
-// --- FETCHERS ---
+// --- ОНОВЛЕНА ФУНКЦІЯ ПЕРЕВІРКИ ---
+function isRelevant(text: string): boolean {
+  const lowerText = text.toLowerCase();
+  
+  // 1. Hard Negative (Футбол, Гороскопи, Африка)
+  if (NEGATIVE_KEYWORDS.some(word => lowerText.includes(word))) return false;
 
-// 1. Повний текст статті через Cheerio
+  // 2. REQUIRED CONTEXT (Якір)
+  // Якщо немає слова "Україна", "РФ", "Путін" і т.д. - це не наша тема
+  const hasContext = REQUIRED_CONTEXT.some(word => lowerText.includes(word));
+  if (!hasContext) return false;
+
+  // 3. Тематична відповідність
+  return ALL_RELEVANT_KEYWORDS.some(keyword => lowerText.includes(keyword));
+}
+
+// --- FETCHERS ---
 async function fetchArticleContent(url: string): Promise<string> {
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000); 
-
     const res = await fetch(url, { 
       signal: controller.signal,
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PeaceDealBot/1.0)' }
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PeaceDealMonitor/1.0)' }
     });
     clearTimeout(timeoutId);
-
     if (!res.ok) return '';
-
     const html = await res.text();
     const $ = cheerio.load(html);
-
     $('script, style, nav, footer, header, aside, .advertisement, .comments').remove();
     let text = $('article').text() || $('.post-content').text() || $('main').text() || $('body').text();
-    text = text.replace(/\s+/g, ' ').trim();
-    return text.slice(0, 4000);
-  } catch (error) {
-    console.error(`Scraping error for ${url}:`, error);
-    return ''; 
-  }
+    return text.replace(/\s+/g, ' ').trim().slice(0, 4000);
+  } catch (error) { return ''; }
 }
 
-// 2. API новин
 async function fetchNewsAPIItems() {
   const apiKey = process.env.NEWS_API_KEY;
   if (!apiKey) return [];
@@ -192,13 +124,13 @@ async function fetchNewsAPIItems() {
       title: article.title,
       link: article.url,
       contentSnippet: article.description,
-      sourceName: `NewsAPI (${article.source.name})`
+      sourceName: `NewsAPI (${article.source.name})`,
+      weight: 0.8
     }));
   } catch (error) { return []; }
 }
 
-// 3. RSS стрічки
-async function fetchRSS(source: NewsSource) {
+async function fetchRSS(source: any) {
   try {
     const feed = await parser.parseURL(source.url);
     return feed.items.map(item => ({
@@ -212,54 +144,55 @@ async function fetchRSS(source: NewsSource) {
   } catch (e) { return []; }
 }
 
-// --- MAIN CRON HANDLER ---
+// --- MAIN FUNCTION ---
 export async function GET() {
   try {
-    console.log('🔄 Cron started (Full Dictionary + Multi-Agent)...');
+    console.log('🔄 Cron started (Strict Context Filtering)...');
     
-    // Запускаємо всі джерела паралельно
-    const tasks = [...SOURCES.map(source => fetchRSS(source)), fetchNewsAPIItems()];
+    const { data: recentNews } = await supabase
+      .from('news')
+      .select('title, url')
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    const tasks = [...SOURCES.map(source => source.type === 'rss' ? fetchRSS(source) : Promise.resolve([])), fetchNewsAPIItems()];
     const results = await Promise.all(tasks);
     const allNews = results.flat().filter(item => item && item.title);
 
-    // Сортуємо: нові зверху
     const sortedNews = allNews
       .sort((a, b) => new Date(b.pubDate || '').getTime() - new Date(a.pubDate || '').getTime())
-      .slice(0, 40); // Беремо топ-40 для аналізу
+      .slice(0, 40);
 
     let processedCount = 0;
 
     for (const item of sortedNews) {
-      if (processedCount >= 2) break; // Ліміт на один запуск
+      if (processedCount >= 2) break; 
       if (!item.link || !item.title) continue;
 
-      // 1. Первинний фільтр (Snippet)
+      const isUrlDup = recentNews?.some(dbItem => dbItem.url === item.link);
+      if (isUrlDup) continue;
+
+      const isSemanticDup = recentNews?.some(dbItem => {
+        const similarity = getSimilarity(item.title, dbItem.title);
+        return similarity > 0.6;
+      });
+      if (isSemanticDup) continue;
+
+      // 1. Фейс-контроль (заголовок)
       const snippetCheck = `${item.title} ${item.contentSnippet || ''}`;
       if (!isRelevant(snippetCheck)) continue;
 
-      // 2. Перевірка на дублікат
-      const { data: existing } = await supabase.from('news').select('id').eq('url', item.link).single();
-      if (existing) continue;
+      console.log(`⚡ Fetching Full Text: ${item.title}`);
+      let fullText = await fetchArticleContent(item.link);
+      if (!fullText || fullText.length < 200) fullText = item.contentSnippet || item.title;
 
-      console.log(`⚡ Analyzing: [${item.sourceName}] ${item.title}`);
-      
-      // 3. Завантаження повного тексту (для RSS)
-      let fullText = item.contentSnippet;
-      // Якщо це RSS, намагаємося дістати повний текст статті
-      if (item.sourceName && item.sourceName.includes('(RSS)')) {
-         const scrapedText = await fetchArticleContent(item.link);
-         if (scrapedText.length > 200) {
-             fullText = scrapedText;
-         }
-      }
-
-      // 4. Вторинний фільтр (по повному тексту)
+      // 2. Фейс-контроль (повний текст)
+      // Це фінальний бар'єр: якщо в тексті статті немає "Ukraine/Russia/etc", ми її викидаємо
       if (!isRelevant(fullText)) {
-        console.log('Skipped after full-text check');
+        console.log('Skipped: Context mismatch (No anchors found)');
         continue;
       }
 
-      // 5. AI PROMPT (Multi-Agent Debate)
       const systemPrompt = `
         You are an advanced AI simulation engine (Multi-Agent Debate).
         Analyze the provided FULL TEXT of the article.
@@ -288,13 +221,11 @@ export async function GET() {
       const aiResponse = JSON.parse(completion.choices[0].message.content || "{}");
       let scores = aiResponse.scores || { peremoha:0, zamorozhennya:0, gnyla_ugoda:0, visnazhennya:0, chaos_rf:0, chaos_ua:0 };
 
-      // 6. Застосування ваги джерела
       const weight = item.weight || 0.8; 
       for (const key in scores) {
         scores[key] = Math.round(scores[key] * weight);
       }
 
-      // 7. Збереження
       await supabase.from('news').insert([{
         date: new Date().toISOString(),
         source: `${item.sourceName}`,
