@@ -5,22 +5,20 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin", "cyrillic"], variable: "--font-inter" });
 const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
-// Щоб картинка працювала, тобі треба покласти файл og-image.png у папку public
-// Я додав код, який посилається на неї.
 export const metadata: Metadata = {
-  title: "PeaceDeal.AI | War Scenarios Analytics",
-  description: "AI-driven probabilistic model forecasting 6 war-ending scenarios in Ukraine. Real-time tracking via DIME methodology.",
+  title: "PeaceDeal Monitor | Analytics",
+  description: "Моніторинг сценаріїв завершення війни в Україні. Аналіз відкритих джерел (OSINT) на основі сценарного моделювання.",
   openGraph: {
-    title: "PeaceDeal.AI Dashboard",
-    description: "Моніторинг сценаріїв завершення війни. Аналіз 24/7 на базі AI.",
+    title: "PeaceDeal Monitor",
+    description: "Моніторинг сценаріїв завершення війни. Аналіз відкритих джерел.",
     url: "https://peace-deal-dashboard.netlify.app",
     siteName: "PeaceDeal Analytics",
     images: [
       {
-        url: '/og-image.png', // Тобі треба додати цей файл в public!
+        url: '/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'PeaceDeal AI Analytics Dashboard',
+        alt: 'PeaceDeal Analytics Dashboard',
       },
     ],
     locale: "uk_UA",
@@ -28,7 +26,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "PeaceDeal AI Analytics",
+    title: "PeaceDeal Monitor",
     description: "Live war scenario probability tracker.",
     images: ['/og-image.png'],
   },

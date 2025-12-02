@@ -1,7 +1,8 @@
 export const dictionary = {
   ua: {
     title: "PEACEDEAL",
-    subtitle: "AI-АНАЛІТИКА",
+    monitor: "МОНІТОР",
+    subtitle: "АНАЛІТИКА ВІДКРИТИХ ДЖЕРЕЛ",
     events: "ПОДІЙ",
     status: "ОНЛАЙН",
     matrixTitle: "МАТРИЦЯ ЙМОВІРНОСТЕЙ",
@@ -9,8 +10,8 @@ export const dictionary = {
     feedTitle: "СТРІЧКА ПОДІЙ",
     feedWaiting: "Очікування потоку даних...",
     neutral: "НЕЙТРАЛЬНИЙ ВПЛИВ",
-    methodologyBtn: "[ ПРО СИСТЕМУ ]",
-    methodologyTitle: "ЯК ЦЕ ПРАЦЮЄ",
+    methodologyBtn: "[ ПРО ПРОЄКТ ]",
+    methodologyTitle: "ПРО ПРОЄКТ",
     ackButton: "ЗРОЗУМІЛО",
     footer: "Розроблено",
     scenarios: {
@@ -22,18 +23,21 @@ export const dictionary = {
       chaos_ua: { title: "Хаос в Україні", desc: "Внутрішня криза, економічний колапс або соціальний вибух." }
     },
     modal: {
-      intro: "Цей дашборд використовує Штучний Інтелект для аналізу новин у реальному часі та оцінки їх впливу на сценарії завершення війни.",
-      p1_title: "1. Модель Пекара",
-      p1_text: "Ми не використовуємо бінарну логіку 'Перемога/Зрада'. Система відстежує 6 ймовірних сценаріїв майбутнього.",
-      p2_title: "2. DIME Методологія",
-      p2_text: "AI аналізує кожну новину через 4 фактори: Дипломатія, Інформація, Військова справа, Економіка.",
+      intro: "Цей дашборд — інструмент OSINT-аналітики, що відстежує динаміку змін в інформаційному полі та оцінює їх вплив на майбутнє.",
+      p1_title: "1. Сценарне Моделювання",
+      p1_text_pre: "В основі системи лежать 6 сценаріїв завершення війни, розроблені",
+      p1_author: "Валерієм Пекарем",
+      p1_link_text: "Читати статтю",
+      p2_title: "2. Методологія Аналізу",
+      p2_text: "Система використовує DIME (Diplomacy, Information, Military, Economic) для оцінки кожної новини.",
       p3_title: "3. Джерела",
-      p3_text: "Ми агрегуємо дані з перевірених українських (УП, BBC) та світових (Reuters, CNN) джерел."
+      p3_text: "Агрегація даних з верифікованих джерел (ЗМІ, офіційні канали, міжнародні агентства)."
     }
   },
   en: {
     title: "PEACEDEAL",
-    subtitle: "AI-ANALYTICS",
+    monitor: "MONITOR",
+    subtitle: "OPEN SOURCE ANALYTICS",
     events: "EVENTS",
     status: "ONLINE",
     matrixTitle: "PROBABILITY MATRIX",
@@ -41,8 +45,8 @@ export const dictionary = {
     feedTitle: "INTELLIGENCE FEED",
     feedWaiting: "Waiting for data stream...",
     neutral: "NEUTRAL IMPACT",
-    methodologyBtn: "[ HOW IT WORKS ]",
-    methodologyTitle: "SYSTEM ARCHITECTURE",
+    methodologyBtn: "[ ABOUT PROJECT ]",
+    methodologyTitle: "ABOUT PROJECT",
     ackButton: "ACKNOWLEDGE",
     footer: "Created by",
     scenarios: {
@@ -54,13 +58,15 @@ export const dictionary = {
       chaos_ua: { title: "Chaos in UA", desc: "Internal crisis, economic collapse, or social unrest in Ukraine." }
     },
     modal: {
-      intro: "This dashboard utilizes Artificial Intelligence to analyze real-time news and forecast war-ending scenarios.",
-      p1_title: "1. Pekar's Model",
-      p1_text: "Instead of binary outcomes, we track probability across 6 distinct geopolitical scenarios.",
-      p2_title: "2. DIME Methodology",
-      p2_text: "AI agents analyze events through Diplomatic, Information, Military, and Economic lenses.",
+      intro: "This dashboard is an OSINT analytics tool tracking information dynamics and their impact on future scenarios.",
+      p1_title: "1. Scenario Modeling",
+      p1_text_pre: "The system is based on 6 war-ending scenarios developed by",
+      p1_author: "Valerii Pekar",
+      p1_link_text: "Read article",
+      p2_title: "2. Methodology",
+      p2_text: "We use DIME (Diplomacy, Information, Military, Economic) framework to score each event.",
       p3_title: "3. Data Sources",
-      p3_text: "We aggregate intelligence from verified Ukrainian (UP, BBC) and Global (Reuters, CNN) feeds."
+      p3_text: "Aggregation from verified sources (Media, Official channels, Global agencies)."
     }
   }
 };

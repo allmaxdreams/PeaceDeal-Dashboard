@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import ScenarioChart from './ScenarioChart';
-import { dictionary } from '../lib/dictionary'; // Імпорт словника
+import { dictionary } from '../lib/dictionary';
 
 type DashboardProps = {
   newsList: any[];
@@ -12,11 +12,11 @@ type DashboardProps = {
 
 export default function DashboardClient({ newsList, chartData, scenarios }: DashboardProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [lang, setLang] = useState<'ua' | 'en'>('ua'); // Стан мови
+  const [lang, setLang] = useState<'ua' | 'en'>('ua');
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const t = dictionary[lang]; // Поточний переклад
+  const t = dictionary[lang];
 
-  // Фільтрація новин
   const filteredNews = selectedId 
     ? newsList.filter(news => {
         const scores = news.scenario_scores || {};
@@ -29,30 +29,26 @@ export default function DashboardClient({ newsList, chartData, scenarios }: Dash
     else setSelectedId(id);
   };
 
-  // Компонент модального вікна (вбудований для доступу до state мови)
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
   return (
     <main className="min-h-screen bg-[#0b1120] text-slate-300 font-sans flex flex-col">
       
-      {/* --- HEADER --- */}
+      {/* HEADER */}
       <nav className="border-b border-slate-800 bg-[#0f172a]/90 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           
-          {/* Logo */}
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => setSelectedId(null)}>
             <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]"></div>
             <div className="flex flex-col">
+              {/* ЗМІНА: PEACEDEAL МОНІТОР */}
               <h1 className="text-lg font-bold text-slate-100 tracking-tight font-mono leading-none">
-                {t.title}<span className="text-slate-600">.AI</span>
+                {t.title} <span className="text-slate-500 font-normal">{t.monitor}</span>
               </h1>
+              {/* ЗМІНА: АНАЛІТИКА ВІДКРИТИХ ДЖЕРЕЛ */}
               <span className="text-[9px] text-slate-500 font-mono tracking-widest">{t.subtitle}</span>
             </div>
           </div>
           
-          {/* Right Controls */}
           <div className="flex gap-4 items-center">
-            {/* Lang Switcher */}
             <div className="flex border border-slate-700 rounded overflow-hidden">
               <button 
                 onClick={() => setLang('ua')}
@@ -84,7 +80,7 @@ export default function DashboardClient({ newsList, chartData, scenarios }: Dash
         </div>
       </nav>
 
-      {/* --- CONTENT --- */}
+      {/* CONTENT */}
       <div className="flex-grow max-w-7xl w-full mx-auto p-4 lg:p-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
@@ -105,7 +101,6 @@ export default function DashboardClient({ newsList, chartData, scenarios }: Dash
               {scenarios.map((s) => {
                 const isActive = selectedId === s.id;
                 const isDimmed = selectedId && !isActive;
-                // Переклад сценарію
                 const translated = t.scenarios[s.id as keyof typeof t.scenarios];
 
                 return (
@@ -216,7 +211,7 @@ export default function DashboardClient({ newsList, chartData, scenarios }: Dash
         </div>
       </div>
 
-      {/* --- FOOTER --- */}
+      {/* FOOTER */}
       <footer className="border-t border-slate-800 bg-[#0f172a] mt-12 py-6">
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center text-[10px] font-mono text-slate-500">
           <div>
@@ -228,7 +223,7 @@ export default function DashboardClient({ newsList, chartData, scenarios }: Dash
         </div>
       </footer>
 
-      {/* --- MODAL --- */}
+      {/* MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}>
           <div className="bg-[#0b1120] border border-slate-700 w-full max-w-3xl max-h-[85vh] rounded-lg shadow-2xl overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
@@ -241,7 +236,18 @@ export default function DashboardClient({ newsList, chartData, scenarios }: Dash
               
               <section>
                 <h3 className="text-emerald-400 font-bold font-mono text-xs mb-2 uppercase">{t.modal.p1_title}</h3>
-                <p>{t.modal.p1_text}</p>
+                <p>
+                  {t.modal.p1_text_pre} <strong>{t.modal.p1_author}</strong>. 
+                  <br/>
+                  <a 
+                    href="https://site.ua/valerii.pekar/scenariyi-zaversennya-viini-pidsumki-forsaitu-iyooon8" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-blue-400 hover:text-blue-300 underline underline-offset-4 mt-1 inline-block"
+                  >
+                    [{t.modal.p1_link_text}]
+                  </a>
+                </p>
               </section>
               <section>
                 <h3 className="text-emerald-400 font-bold font-mono text-xs mb-2 uppercase">{t.modal.p2_title}</h3>
