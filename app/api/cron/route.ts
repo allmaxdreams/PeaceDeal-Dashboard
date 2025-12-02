@@ -7,9 +7,7 @@ import { supabase } from '@/app/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
-// --- 1. КОНФІГУРАЦІЯ ДЖЕРЕЛ ---
-
-// RSS
+// --- 1. ДЖЕРЕЛА ---
 interface NewsSource { name: string; url: string; weight: number; }
 const RSS_SOURCES: NewsSource[] = [
   { name: 'УП', url: 'https://www.pravda.com.ua/rss/view_news/', weight: 0.9 },
@@ -24,9 +22,9 @@ const RSS_SOURCES: NewsSource[] = [
   { name: 'CNN World', url: 'http://rss.cnn.com/rss/edition_world.rss', weight: 1.0 },
   { name: 'The Guardian', url: 'https://www.theguardian.com/world/rss', weight: 1.0 },
   { name: 'CNBC', url: 'https://www.cnbc.com/id/100727362/device/rss/rss.html', weight: 0.9 },
+  { name: 'Global NewsAPI', type: 'api', url: 'https://newsapi.org/v2/everything', weight: 0.8 }
 ];
 
-// TELEGRAM
 interface TelegramSource { name: string; username: string; weight: number; }
 const TELEGRAM_CHANNELS: TelegramSource[] = [
   { name: 'DeepState', username: 'DeepStateUA', weight: 1.0 },
@@ -131,44 +129,10 @@ const NEGATIVE_KEYWORDS = [
 const parser = new Parser();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// --- HELPERS ---
-
-function getSimilarity(str1: string, str2: string): number {
-  if (!str1 || !str2) return 0;
-  const s1 = str1.toLowerCase().replace(/[^\w\sа-яіїєґ]/g, '');
-  const s2 = str2.toLowerCase().replace(/[^\w\sа-яіїєґ]/g, '');
-  if (s1 === s2) return 1;
-  if (s1.length < 2 || s2.length < 2) return 0;
-  const bigrams1 = new Set();
-  for (let i = 0; i < s1.length - 1; i++) bigrams1.add(s1.substring(i, i + 2));
-  const bigrams2 = new Set();
-  for (let i = 0; i < s2.length - 1; i++) bigrams2.add(s2.substring(i, i + 2));
-  let intersection = 0;
-  bigrams1.forEach(item => { if (bigrams2.has(item)) intersection++; });
-  return (2.0 * intersection) / (bigrams1.size + bigrams2.size);
-}
-
-function shuffleArray(array: any[]) {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
-  }
-  return array;
-}
-
-function isRelevant(text: string): boolean {
-  const lowerText = text.toLowerCase();
-  if (NEGATIVE_KEYWORDS.some(word => lowerText.includes(word))) return false;
-  // 1. Обов'язковий контекст (Anchors)
-  const REQUIRED_CONTEXT = ['ukraine','ukrainian','україна','kyiv','kiev','russia','russian','росія','рф','moscow','putin','zelensky','zsu','afu','nato','нато'];
-  if (!REQUIRED_CONTEXT.some(word => lowerText.includes(word))) return false;
-  // 2. Тематика
-  return ALL_RELEVANT_KEYWORDS.some(keyword => lowerText.includes(keyword));
-}
-
 // --- FETCHERS ---
 
 // TELEGRAM PARSER
+// ... (fetchTelegram code remains unchanged)
 async function fetchTelegram(source: TelegramSource) {
   try {
     const url = `https://t.me/s/${source.username}`;
@@ -180,7 +144,7 @@ async function fetchTelegram(source: TelegramSource) {
     const items: any[] = [];
 
     $('.tgme_widget_message_wrap').each((i, el) => {
-      if (i >= 3) return; // Top 3
+      if (i >= 3) return; 
       const $el = $(el);
       const rawHtml = $el.find('.tgme_widget_message_text').html();
       if (!rawHtml) return;
@@ -204,6 +168,8 @@ async function fetchTelegram(source: TelegramSource) {
   } catch (e) { return []; }
 }
 
+// FULL TEXT PARSER (Cheerio)
+// ... (fetchArticleContent code remains unchanged)
 async function fetchArticleContent(url: string): Promise<string> {
   try {
     const controller = new AbortController();
@@ -222,6 +188,7 @@ async function fetchArticleContent(url: string): Promise<string> {
   } catch (error) { return ''; }
 }
 
+// ... (fetchNewsAPIItems and fetchRSS code remains unchanged)
 async function fetchNewsAPIItems() {
   const apiKey = process.env.NEWS_API_KEY;
   if (!apiKey) return [];
@@ -240,7 +207,7 @@ async function fetchNewsAPIItems() {
   } catch (error) { return []; }
 }
 
-async function fetchRSS(source: any) {
+async function fetchRSS(source: NewsSource) {
   try {
     const feed = await parser.parseURL(source.url);
     return feed.items.map(item => ({
@@ -254,10 +221,11 @@ async function fetchRSS(source: any) {
   } catch (e) { return []; }
 }
 
-// --- MAIN FUNCTION ---
+
+// --- MAIN CRON HANDLER ---
 export async function GET() {
   try {
-    console.log('🔄 Cron started (Telegram + RSS + API)...');
+    console.log('🔄 Cron started (Deep Analysis Mode)...');
     
     const { data: recentNews } = await supabase
       .from('news')
@@ -304,30 +272,25 @@ export async function GET() {
 
       // ОТРИМАННЯ КОНТЕНТУ
       let fullText = item.contentSnippet;
-      if (item.sourceName.includes('(RSS)')) {
+      if (!item.sourceName.includes('NewsAPI') && !item.sourceName.includes('DeepState') && !item.sourceName.includes('Лачен') && !item.sourceName.includes('Zelenskiy') && !item.sourceName.includes('Генштаб')) {
          const scraped = await fetchArticleContent(item.link);
          if (scraped.length > 200) fullText = scraped;
       }
 
-      if (!isRelevant(fullText)) {
-        console.log('Skipped after full-text check');
-        continue;
-      }
+      if (!isRelevant(fullText)) continue;
 
-      // AI ANALYTICS
+      // --- ВДОСКОНАЛЕНА ЛОГІКА АНАЛІЗУ ---
       const systemPrompt = `
         You are an advanced AI simulation engine (Multi-Agent Debate).
-        Analyze the text provided.
+        Analyze the provided FULL TEXT of the article.
         
-        METHODOLOGY: DIME (Diplomatic, Info, Military, Economic).
-        SCENARIOS: Peremoha, Zamorozhennya, Gnyla Ugoda, Visnazhennya, Chaos RF, Chaos UA.
-
-        AGENTS:
-        1. Skeptic: Filters noise/propaganda.
-        2. Strategist: Assesses strategic impact (-100 to +100).
-        3. Judge: Final decision.
-
-        IMPORTANT: If source is 'DeepState' or 'GenStaff', treat military updates as High Confidence facts.
+        ### METHODOLOGY: DIME (Diplomatic, Info, Military, Economic).
+        ### SCENARIOS: Peremoha, Zamorozhennya, Gnyla Ugoda, Visnazhennya, Chaos RF, Chaos UA.
+        
+        ### RULES:
+        1. **STAGNATION INDICATOR:** Failure to resolve core issues (like territory or NATO) is a strong signal for **Visnazhennya (Attrition)** or **Zamorozhennya**.
+        2. **DIVERGENCE:** Transatlantic disputes (US vs NATO) boost *Freeze/Rotten Deal*.
+        3. **Confidence:** For sources like 'DeepState', 'GenStaff', treat facts as high confidence.
 
         OUTPUT JSON: { "summary": "...", "scores": { "peremoha": 0, "zamorozhennya": 0, "gnyla_ugoda": 0, "visnazhennya": 0, "chaos_rf": 0, "chaos_ua": 0 } }
       `;
