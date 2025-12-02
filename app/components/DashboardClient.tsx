@@ -17,6 +17,7 @@ export default function DashboardClient({ newsList, chartData, scenarios }: Dash
 
   const t = dictionary[lang];
 
+  // Фільтрація новин за сценарієм
   const filteredNews = selectedId 
     ? newsList.filter(news => {
         const scores = news.scenario_scores || {};
@@ -24,6 +25,7 @@ export default function DashboardClient({ newsList, chartData, scenarios }: Dash
       })
     : newsList;
 
+  // Обробка кліку на картку
   const handleCardClick = (id: string) => {
     if (selectedId === id) setSelectedId(null);
     else setSelectedId(id);
@@ -39,16 +41,15 @@ export default function DashboardClient({ newsList, chartData, scenarios }: Dash
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => setSelectedId(null)}>
             <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]"></div>
             <div className="flex flex-col">
-              {/* ЗМІНА: PEACEDEAL МОНІТОР */}
               <h1 className="text-lg font-bold text-slate-100 tracking-tight font-mono leading-none">
                 {t.title} <span className="text-slate-500 font-normal">{t.monitor}</span>
               </h1>
-              {/* ЗМІНА: АНАЛІТИКА ВІДКРИТИХ ДЖЕРЕЛ */}
               <span className="text-[9px] text-slate-500 font-mono tracking-widest">{t.subtitle}</span>
             </div>
           </div>
           
           <div className="flex gap-4 items-center">
+            {/* Перемикач мов */}
             <div className="flex border border-slate-700 rounded overflow-hidden">
               <button 
                 onClick={() => setLang('ua')}
@@ -64,6 +65,7 @@ export default function DashboardClient({ newsList, chartData, scenarios }: Dash
               </button>
             </div>
 
+            {/* Кнопка Методології */}
             <button 
               onClick={() => setIsModalOpen(true)}
               className="hidden md:block px-3 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 rounded text-[10px] font-mono text-slate-400 transition-all tracking-wider"
@@ -215,7 +217,7 @@ export default function DashboardClient({ newsList, chartData, scenarios }: Dash
       <footer className="border-t border-slate-800 bg-[#0f172a] mt-12 py-6">
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center text-[10px] font-mono text-slate-500">
           <div>
-            © 2025 PEACEDEAL.AI // KYIV, UKRAINE
+            © 2025 PEACEDEAL MONITOR // KYIV
           </div>
           <div className="flex items-center gap-2 mt-2 md:mt-0">
             {t.footer} <a href="https://www.linkedin.com/in/allmaxdreams/" target="_blank" rel="noopener noreferrer" className="text-slate-300 hover:text-emerald-400 transition-colors">MAKSYM KUZMENKO</a>
