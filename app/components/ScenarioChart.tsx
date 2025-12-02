@@ -7,15 +7,16 @@ import {
 
 type ChartProps = {
   data: any[];
+  selectedId: string | null; // Новий проп
 };
 
 const COLORS = {
-  peremoha: '#4ade80',      // Яскраво-зелений
-  zamorozhennya: '#3b82f6', // Яскраво-синій
-  gnyla_ugoda: '#facc15',   // Жовтий
-  visnazhennya: '#94a3b8',  // Світло-сірий
-  chaos_rf: '#f87171',      // Червоний
-  chaos_ua: '#fb923c',      // Помаранчевий
+  peremoha: '#4ade80',
+  zamorozhennya: '#3b82f6',
+  gnyla_ugoda: '#facc15',
+  visnazhennya: '#94a3b8',
+  chaos_rf: '#f87171',
+  chaos_ua: '#fb923c',
 };
 
 const NAMES = {
@@ -27,7 +28,7 @@ const NAMES = {
   chaos_ua: 'Хаос в Україні',
 };
 
-export default function ScenarioChart({ data }: ChartProps) {
+export default function ScenarioChart({ data, selectedId }: ChartProps) {
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -50,7 +51,7 @@ export default function ScenarioChart({ data }: ChartProps) {
     <div className="w-full h-[300px] p-2">
       <div className="flex justify-between items-center px-2 mb-2">
         <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest font-mono">
-          Trend (72h)
+          Trend (72h) {selectedId ? `// ${NAMES[selectedId as keyof typeof NAMES].toUpperCase()}` : ''}
         </h3>
       </div>
       
@@ -93,20 +94,26 @@ export default function ScenarioChart({ data }: ChartProps) {
             />
             <Legend iconSize={8} wrapperStyle={{ paddingTop: '10px', fontSize: '10px', fontFamily: 'var(--font-mono)' }} />
             
-            {Object.entries(COLORS).map(([key, color]) => (
-              <Line
-                key={key}
-                type="monotone" // <--- ЦЕ РОБИТЬ ЛІНІЇ ПЛАВНИМИ
-                dataKey={key}
-                name={NAMES[key as keyof typeof NAMES]}
-                stroke={color}
-                strokeWidth={2} // Трохи товстіша лінія для кращого вигляду
-                dot={false}
-                activeDot={{ r: 4, stroke: '#fff', strokeWidth: 1 }}
-                isAnimationActive={true} // Увімкнув плавну анімацію при завантаженні
-                animationDuration={1500}
-              />
-            ))}
+            {Object.entries(COLORS).map(([key, color]) => {
+              // Логіка фільтрації: якщо вибрано щось, ховаємо інші лінії
+              const isHidden = selectedId && selectedId !== key;
+              if (isHidden) return null;
+
+              return (
+                <Line
+                  key={key}
+                  type="monotone"
+                  dataKey={key}
+                  name={NAMES[key as keyof typeof NAMES]}
+                  stroke={color}
+                  strokeWidth={selectedId === key ? 3 : 2} // Вибрана лінія товстіша
+                  dot={false}
+                  activeDot={{ r: 4, stroke: '#fff', strokeWidth: 1 }}
+                  isAnimationActive={true}
+                  animationDuration={1000}
+                />
+              );
+            })}
           </LineChart>
         </ResponsiveContainer>
       </div>
