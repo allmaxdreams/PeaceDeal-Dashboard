@@ -1,4 +1,3 @@
-// app/components/ScenarioChart.tsx
 'use client';
 
 import {
@@ -10,12 +9,12 @@ type ChartProps = {
 };
 
 const COLORS = {
-  peremoha: '#16a34a',      // Зелений
-  zamorozhennya: '#2563eb', // Синій
-  gnyla_ugoda: '#ca8a04',   // Жовтий
-  visnazhennya: '#4b5563',  // Сірий
-  chaos_rf: '#dc2626',      // Червоний
-  chaos_ua: '#ea580c',      // Помаранчевий
+  peremoha: '#16a34a',
+  zamorozhennya: '#2563eb',
+  gnyla_ugoda: '#ca8a04',
+  visnazhennya: '#4b5563',
+  chaos_rf: '#dc2626',
+  chaos_ua: '#ea580c',
 };
 
 const NAMES = {
@@ -28,31 +27,36 @@ const NAMES = {
 };
 
 export default function ScenarioChart({ data }: ChartProps) {
+  // Якщо даних немає або лише одна точка - графік не будується коректно
   if (!data || data.length === 0) {
     return (
-      <div className="w-full h-[300px] bg-white p-4 rounded-xl border border-slate-200 flex items-center justify-center text-slate-400">
-        Графік будується... Чекаємо більше даних.
+      <div className="w-full h-[300px] flex items-center justify-center bg-white rounded-xl border text-slate-400">
+        Даних ще немає. Очікуємо новини...
       </div>
     );
   }
 
   return (
-    <div className="w-full h-[400px] bg-white p-4 rounded-xl shadow-md border border-slate-200">
-      <h3 className="text-lg font-bold text-slate-700 mb-4">Тренд ймовірностей</h3>
+    <div className="w-full h-[400px] bg-white p-2 md:p-4 rounded-xl shadow-md border border-slate-200">
+      <h3 className="text-lg font-bold text-slate-700 mb-4 ml-2">Тренд ймовірностей</h3>
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+        <LineChart data={data} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
           <XAxis 
             dataKey="date" 
-            tick={{ fontSize: 12 }} 
-            tickFormatter={(val) => new Date(val).toLocaleDateString('uk-UA', { day: 'numeric', month: 'short' })}
+            tick={{ fontSize: 10 }}
+            tickFormatter={(str) => {
+              const date = new Date(str);
+              return `${date.getDate()}.${date.getMonth() + 1}`;
+            }}
           />
-          <YAxis domain={[0, 100]} unit="%" tick={{ fontSize: 12 }} />
+          <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
           <Tooltip 
-            labelFormatter={(val) => new Date(val).toLocaleString('uk-UA')}
-            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+            labelFormatter={(label) => new Date(label).toLocaleString('uk-UA')}
+            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
           />
-          <Legend />
+          <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
+          
           {Object.entries(COLORS).map(([key, color]) => (
             <Line
               key={key}
@@ -61,8 +65,9 @@ export default function ScenarioChart({ data }: ChartProps) {
               name={NAMES[key as keyof typeof NAMES]}
               stroke={color}
               strokeWidth={2}
-              dot={false}
+              dot={data.length < 20} // Показувати точки тільки якщо даних мало
               activeDot={{ r: 6 }}
+              isAnimationActive={false} // Вимикаємо анімацію, щоб уникнути глюків при гідратації
             />
           ))}
         </LineChart>
