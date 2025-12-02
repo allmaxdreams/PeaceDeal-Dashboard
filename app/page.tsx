@@ -1,7 +1,6 @@
 import { scenarios } from './lib/data';
 import { supabase } from './lib/supabase';
-import ScenarioChart from './components/ScenarioChart';
-import MethodologyModal from './components/MethodologyModal';
+import DashboardClient from './components/DashboardClient';
 
 export const revalidate = 0;
 
@@ -25,8 +24,8 @@ export default async function Home() {
 
   let currentScores = { ...BASELINES };
 
-  // Коефіцієнт повернення до бази (чим більше, тим швидше графік "забуває" старі новини)
-  const DECAY_RATE_PER_HOUR = 0.01; 
+  // Коефіцієнт повернення до бази
+  const DECAY_RATE_PER_HOUR = 0.0005; 
 
   const startDate = chronoNews.length > 0 
     ? new Date(new Date(chronoNews[0].created_at).getTime() - 3600000).toISOString() 
@@ -39,7 +38,10 @@ export default async function Home() {
   // 2. РОЗРАХУНОК
   chronoNews.forEach(news => {
     const currentEventTime = new Date(news.created_at).getTime();
-    const hoursPassed = (currentEventTime - lastEventTime) / (1000 * 60 * 60);
+    
+    let hoursPassed = (currentEventTime - lastEventTime) / (1000 * 60 * 60);
+    if (hoursPassed < 0) hoursPassed = 0;
+    
     lastEventTime = currentEventTime;
 
     // КРОК A: Дрейф до бази (Mean Reversion)
@@ -49,9 +51,6 @@ export default async function Home() {
         const current = currentScores[k];
         
         let drift = (baseline - current) * (DECAY_RATE_PER_HOUR * hoursPassed);
-        // Захист від перельоту
-        if (Math.abs(drift) > Math.abs(baseline - current)) drift = baseline - current;
-        
         currentScores[k] += drift;
     });
 
@@ -61,22 +60,18 @@ export default async function Home() {
       Object.entries(scores).forEach(([key, val]) => {
         const k = key as keyof typeof currentScores;
         if (currentScores[k] !== undefined) {
-          // Додаємо вплив
           currentScores[k] += Number(val);
-          // Не даємо піти в мінус перед нормалізацією
           if (currentScores[k] < 0) currentScores[k] = 0; 
         }
       });
     }
 
-    // КРОК C: НОРМАЛІЗАЦІЯ (Головний Фікс!)
-    // Сума всіх сценаріїв має бути 100%. Якщо вийшло 150%, ми пропорційно зменшуємо всі.
+    // КРОК C: НОРМАЛІЗАЦІЯ (100%)
     const totalScore = Object.values(currentScores).reduce((acc, score) => acc + score, 0);
     
     if (totalScore > 0) {
       Object.keys(currentScores).forEach(key => {
         const k = key as keyof typeof currentScores;
-        // Формула: (ПоточнийБал / ЗагальнуСуму) * 100
         currentScores[k] = (currentScores[k] / totalScore) * 100;
       });
     }
@@ -95,137 +90,12 @@ export default async function Home() {
     score: Math.round(currentScores[s.id as keyof typeof currentScores] || 0)
   }));
 
+  // Передаємо дані в клієнтський компонент
   return (
-    <main className="min-h-screen bg-[#0b1120] text-slate-300 font-sans flex flex-col">
-      <nav className="border-b border-slate-800 bg-[#0f172a]/90 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]"></div>
-            <div className="flex flex-col">
-              <h1 className="text-lg font-bold text-slate-100 tracking-tight font-mono leading-none">
-                PEACEDEAL <span className="text-slate-500 font-normal">МОНІТОР</span>
-              </h1>
-              <span className="text-[9px] text-slate-500 font-mono tracking-widest">АНАЛІТИКА ВІДКРИТИХ ДЖЕРЕЛ</span>
-            </div>
-          </div>
-          
-          <div className="flex gap-4 items-center">
-            <MethodologyModal />
-            <div className="hidden sm:flex gap-2 text-[10px] font-mono text-slate-500">
-              <div className="px-2 py-1 bg-slate-900 rounded border border-slate-800">
-                EVENTS: {newsList?.length || 0}
-              </div>
-              <div className="px-2 py-1 bg-slate-900 rounded border border-slate-800 text-emerald-500">
-                SYS: ONLINE
-              </div>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      <div className="max-w-7xl mx-auto p-4 lg:p-6">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          
-          {/* MATRIX */}
-          <div className="lg:col-span-4 space-y-3">
-            <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest font-mono mb-2">
-              МАТРИЦЯ ЙМОВІРНОСТЕЙ
-            </h2>
-            <div className="grid grid-cols-2 lg:grid-cols-1 gap-3">
-              {liveScenarios.map((s) => (
-                <div key={s.id} className="group bg-slate-900/50 border border-slate-800 hover:border-slate-600 transition-all p-3 rounded-md">
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="text-xs font-bold text-slate-300 leading-tight">{s.title}</span>
-                    <span className="text-lg font-mono font-bold text-white leading-none">{s.score}%</span>
-                  </div>
-                  <div className="w-full bg-slate-800 h-1 mb-2 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full transition-all duration-1000"
-                      style={{ 
-                        width: `${s.score}%`,
-                        backgroundColor: s.id === 'peremoha' ? '#4ade80' : 
-                                       s.id === 'chaos_rf' ? '#f87171' : 
-                                       s.id === 'zamorozhennya' ? '#3b82f6' : '#94a3b8' 
-                      }}
-                    ></div>
-                  </div>
-                  <p className="text-[10px] text-slate-600 line-clamp-2 leading-relaxed">
-                    {s.description}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* CHART & FEED */}
-          <div className="lg:col-span-8 space-y-6">
-            <section className="bg-slate-900/50 border border-slate-800 rounded-lg p-1">
-               <ScenarioChart data={chartData} />
-            </section>
-
-            <section>
-              <div className="flex justify-between items-end mb-3 border-b border-slate-800 pb-2">
-                <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest font-mono">
-                  СТРІЧКА ПОДІЙ
-                </h2>
-                <span className="text-[10px] font-mono text-slate-600">LIVE</span>
-              </div>
-
-              <div className="space-y-3">
-                {(!newsList || newsList.length === 0) && (
-                  <p className="text-center text-slate-600 font-mono text-xs py-8">Initializing data stream...</p>
-                )}
-                
-                {newsList?.map((news) => {
-                    const scores = (news.scenario_scores || {}) as Record<string, number>;
-                    const impacts = Object.entries(scores).filter(([_, v]) => v !== 0);
-
-                    return (
-                      <div key={news.id} className="p-3 md:p-4 bg-[#0f172a] border border-slate-800 rounded hover:border-slate-700 transition-colors group">
-                        <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-slate-500 mb-1">
-                          <span className="text-emerald-500 px-1.5 py-0.5 bg-emerald-500/10 rounded uppercase">
-                            {news.source.replace('(RSS)', '').replace('NewsAPI', '').trim()}
-                          </span>
-                          <span>{new Date(news.created_at).toLocaleString('uk-UA', { month: 'numeric', day: 'numeric', hour: '2-digit', minute:'2-digit'})}</span>
-                        </div>
-                        
-                        <div className="flex flex-col gap-2">
-                          <h3 className="text-sm font-semibold text-slate-200 leading-snug hover:text-blue-400 transition-colors">
-                            <a href={news.url} target="_blank" rel="noopener noreferrer">
-                              {news.title}
-                            </a>
-                          </h3>
-                          {news.summary && (
-                            <p className="text-xs text-slate-400 font-light border-l-2 border-slate-700 pl-2">
-                              {news.summary}
-                            </p>
-                          )}
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {impacts.length > 0 ? (
-                              impacts.map(([key, val]) => {
-                                const label = liveScenarios.find(s => s.id === key)?.title || key;
-                                const isPos = val > 0;
-                                return (
-                                  <span key={key} className={`inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono rounded border ${isPos ? 'border-emerald-900/50 bg-emerald-900/10 text-emerald-400' : 'border-rose-900/50 bg-rose-900/10 text-rose-400'}`}>
-                                    {label} {isPos ? '↑' : '↓'}{Math.abs(val)}
-                                  </span>
-                                );
-                              })
-                            ) : (
-                              <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono rounded border border-slate-700 bg-slate-800 text-slate-500">
-                                NEUTRAL IMPACT
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                })}
-              </div>
-            </section>
-          </div>
-        </div>
-      </div>
-    </main>
+    <DashboardClient 
+      newsList={newsList || []} 
+      chartData={chartData} 
+      scenarios={liveScenarios} 
+    />
   );
 }
