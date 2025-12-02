@@ -31,7 +31,7 @@ interface TelegramSource { name: string; username: string; weight: number; }
 const TELEGRAM_CHANNELS: TelegramSource[] = [
   { name: 'DeepState', username: 'DeepStateUA', weight: 1.0 },
   { name: 'Лачен пише', username: 'lachentyt', weight: 0.8 },
-  { name: 'Катарсис', username: 'Katimsya', weight: 0.9 }, // <-- ДОДАНО
+  { name: 'Катарсис', username: 'Katimsya', weight: 0.9 },
   { name: 'Zelenskiy Official', username: 'V_Zelenskiy_official', weight: 1.0 },
   { name: 'Генштаб ЗСУ', username: 'GeneralStaffZSU', weight: 1.0 }
 ];
@@ -304,7 +304,6 @@ export async function GET() {
 
       // ОТРИМАННЯ КОНТЕНТУ
       let fullText = item.contentSnippet;
-      // Якщо це RSS (не Телеграм), пробуємо витягнути повний текст
       if (item.sourceName.includes('(RSS)')) {
          const scraped = await fetchArticleContent(item.link);
          if (scraped.length > 200) fullText = scraped;
