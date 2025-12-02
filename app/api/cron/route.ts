@@ -1,17 +1,3 @@
-Ти абсолютно правий\! Я, прагнучи дати тобі коротку і зрозумілу відповідь про зміни (впровадження паралельності і т.д.), в коді прикладу знову "сховав" великі шматки з ключовими словами під коментарями типу `// ... (Тут залишаємо твої константи ...)`.
-
-Але для роботи коду ці константи **життєво необхідні** в повному обсязі. Без них скрипт просто впаде з помилкою `is not defined`.
-
-Дякую за пильність\! Ось **ПОВНИЙ, РОБОЧИЙ ФАЙЛ**, де я об'єднав:
-
-1.  Усі твої розширені списки ключових слів (UA+EN).
-2.  Нову логіку паралельного завантаження (`Promise.all`).
-3.  Економічні фільтри.
-4.  Професійний AI-промпт.
-
-Скопіюй і встав це в `app/api/cron/route.ts` (заміни весь вміст):
-
-```typescript
 // app/api/cron/route.ts
 import { NextResponse } from 'next/server';
 import Parser from 'rss-parser';
@@ -22,7 +8,6 @@ export const dynamic = 'force-dynamic';
 
 // 1. ДЖЕРЕЛА
 const RSS_SOURCES = [
-  // Україна
   { name: 'УП', url: 'https://www.pravda.com.ua/rss/view_news/' },
   { name: 'BBC UA', url: 'https://feeds.bbci.co.uk/ukrainian/rss.xml' },
   { name: 'NV', url: 'https://nv.ua/ukr/rss/all.xml' },
@@ -31,107 +16,34 @@ const RSS_SOURCES = [
   { name: 'Інтерфакс', url: 'https://interfax.com.ua/news/last.rss' },
   { name: 'Радіо Свобода', url: 'https://www.radiosvoboda.org/api/zrqpomqe_q' },
   { name: 'Економічна Правда', url: 'https://www.epravda.com.ua/rss/news/' },
-  
-  // Світ (RSS)
   { name: 'BBC World', url: 'https://feeds.bbci.co.uk/news/world/rss.xml' },
   { name: 'CNN World', url: 'http://rss.cnn.com/rss/edition_world.rss' },
   { name: 'The Guardian', url: 'https://www.theguardian.com/world/rss' },
   { name: 'CNBC', url: 'https://www.cnbc.com/id/100727362/device/rss/rss.html' }
 ];
 
-// 2. ПОВНІ СПИСКИ КЛЮЧОВИХ СЛІВ (Smart Dictionary)
+// 2. КЛЮЧОВІ СЛОВА (ПОВНИЙ СПИСОК)
+const KW_KEY_FIGURES = ['зеленський', 'zelensky', 'єрмак', 'yermak', 'кулеба', 'kuleba', 'сибіга', 'sybiha', 'залужний', 'zaluzhnyi', 'сирський', 'syrskyi', 'трамп', 'trump', 'байден', 'biden', 'рубіо', 'rubio', 'венс', 'vance', 'хегсет', 'hegseth', 'кушнер', 'kushner', 'макрон', 'macron', 'стармер', 'starmer', 'шольц', 'scholz', 'мерц', 'merz', 'дуда', 'duda', 'орбан', 'orban', 'фон дер ляєн', 'von der leyen', 'рютте', 'rutte', 'путін', 'putin', 'лавров', 'lavrov', 'пєсков', 'peskov'];
+const KW_PEREMOHA = ['кордони 1991', 'borders 1991', 'вступ до нато', 'nato accession', 'вступ до єс', 'eu accession', 'репарації', 'reparations', 'трибунал', 'tribunal', 'демілітаризація', 'demilitarization', 'розпад рф', 'collapse of russia', 'перемога', 'victory', 'звільнення', 'liberation'];
+const KW_FREEZE = ['припинення вогню', 'ceasefire', 'лінія розмежування', 'contact line', 'корейський сценарій', 'korean scenario', 'замороження конфлікту', 'frozen conflict', 'мінськ-3', 'minsk-3', 'перемир\'я', 'truce', 'статус-кво', 'status quo'];
+const KW_ROTTEN = ['нейтральний статус', 'neutral status', 'визнання територій', 'recognition of territories', 'відмова від нато', 'nato renunciation', 'фінляндизація', 'finlandization', 'капітуляція', 'capitulation', 'поступки', 'concessions', 'диктат', 'dictate'];
+const KW_ATTRITION = ['війна на виснаження', 'war of attrition', 'затяжна війна', 'long war', 'мобілізація', 'mobilization', 'дефіцит бюджету', 'budget deficit', 'біженці', 'refugees', 'снарядний голод', 'shell hunger', 'ресурси', 'resources', 'бюджет', 'податки', 'пдв', 'економіка рф', 'рубль', 'дефіцит', 'витрати на війну', 'військовий збір', 'санкції', 'нафта', 'газ', 'ввп', 'центробанк', 'нацбанк', 'курс', 'долар'];
+const KW_CHAOS_RF = ['падіння рубля', 'ruble collapse', 'громадянська війна', 'civil war', 'бунт', 'riot', 'розпад', 'disintegration', 'партизани', 'partisans', 'бнр', 'bnr', 'смерть путіна', 'putin death', 'переворот', 'coup'];
+const KW_CHAOS_UA = ['дефолт', 'default', 'майдан-3', 'maidan-3', 'корупційний скандал', 'corruption scandal', 'протести', 'protests', 'політична криза', 'political crisis', 'розкол', 'schism', 'зрада', 'treason', 'економічний колапс', 'economic collapse'];
+const KW_GENERAL = ['зсу', 'afu', 'фронт', 'frontline', 'атака', 'attack', 'вибух', 'explosion', 'ракета', 'missile', 'дрон', 'drone', 'шахед', 'shahed', 'ukraine', 'україна'];
 
-// Політики та Ключові фігури
-const KW_KEY_FIGURES = [
-  'зеленський', 'zelensky', 'єрмак', 'yermak', 'кулеба', 'kuleba', 
-  'сибіга', 'sybiha', 'залужний', 'zaluzhnyi', 'сирський', 'syrskyi',
-  'трамп', 'trump', 'байден', 'biden', 'рубіо', 'rubio', 
-  'венс', 'vance', 'хегсет', 'hegseth', 'кушнер', 'kushner',
-  'макрон', 'macron', 'стармер', 'starmer', 'шольц', 'scholz', 
-  'мерц', 'merz', 'дуда', 'duda', 'орбан', 'orban', 
-  'фон дер ляєн', 'von der leyen', 'рютте', 'rutte',
-  'путін', 'putin', 'лавров', 'lavrov', 'пєсков', 'peskov'
-];
-
-// Сценарій 1: Перемога
-const KW_PEREMOHA = [
-  'кордони 1991', 'borders 1991', 'вступ до нато', 'nato accession', 
-  'вступ до єс', 'eu accession', 'репарації', 'reparations', 
-  'трибунал', 'tribunal', 'демілітаризація', 'demilitarization', 
-  'розпад рф', 'collapse of russia', 'перемога', 'victory', 'звільнення', 'liberation'
-];
-
-// Сценарій 2: Замороження
-const KW_FREEZE = [
-  'припинення вогню', 'ceasefire', 'лінія розмежування', 'contact line', 
-  'корейський сценарій', 'korean scenario', 'замороження конфлікту', 'frozen conflict', 
-  'мінськ-3', 'minsk-3', 'перемир\'я', 'truce', 'статус-кво', 'status quo'
-];
-
-// Сценарій 3: Гнила угода
-const KW_ROTTEN = [
-  'нейтральний статус', 'neutral status', 'визнання територій', 'recognition of territories', 
-  'відмова від нато', 'nato renunciation', 'фінляндизація', 'finlandization', 
-  'капітуляція', 'capitulation', 'поступки', 'concessions', 'диктат', 'dictate'
-];
-
-// Сценарій 4: Виснаження (+ Економіка)
-const KW_ATTRITION = [
-  'війна на виснаження', 'war of attrition', 'затяжна війна', 'long war', 
-  'мобілізація', 'mobilization', 'дефіцит бюджету', 'budget deficit', 
-  'біженці', 'refugees', 'снарядний голод', 'shell hunger', 'ресурси', 'resources',
-  // Економічні маркери війни
-  'бюджет', 'податки', 'пдв', 'економіка рф', 'рубль', 'дефіцит', 
-  'витрати на війну', 'військовий збір', 'санкції', 'нафта', 'газ', 
-  'ввп', 'центробанк', 'нацбанк', 'курс', 'долар'
-];
-
-// Сценарій 5: Хаос у РФ
-const KW_CHAOS_RF = [
-  'падіння рубля', 'ruble collapse', 'громадянська війна', 'civil war', 
-  'бунт', 'riot', 'розпад', 'disintegration', 'партизани', 'partisans', 
-  'бнр', 'bnr', 'смерть путіна', 'putin death', 'переворот', 'coup'
-];
-
-// Сценарій 6: Хаос в Україні
-const KW_CHAOS_UA = [
-  'дефолт', 'default', 'майдан-3', 'maidan-3', 'корупційний скандал', 'corruption scandal', 
-  'протести', 'protests', 'політична криза', 'political crisis', 'розкол', 'schism',
-  'зрада', 'treason', 'економічний колапс', 'economic collapse'
-];
-
-// Загальні військові терміни
-const KW_GENERAL = [
-  'зсу', 'afu', 'фронт', 'frontline', 'атака', 'attack', 'вибух', 'explosion',
-  'ракета', 'missile', 'дрон', 'drone', 'шахед', 'shahed', 'ukraine', 'україна'
-];
-
-// Об'єднуємо все в один масив
-const ALL_RELEVANT_KEYWORDS = [
-  ...KW_KEY_FIGURES,
-  ...KW_PEREMOHA, ...KW_FREEZE, ...KW_ROTTEN, 
-  ...KW_ATTRITION, ...KW_CHAOS_RF, ...KW_CHAOS_UA, ...KW_GENERAL
-];
-
-// Мінус-слова
-const NEGATIVE_KEYWORDS = [
-  'погода', 'weather', 'гороскоп', 'horoscope', 'футбол', 'football', 
-  'концерт', 'concert', 'шоу-бізнес', 'show business', 'рецепт', 'recipe', 
-  'схуднення', 'weight loss', 'знаки зодіаку', 'zodiac', 'мода', 'fashion',
-  'спорт', 'sport', 'матч', 'match', 'ліга чемпіонів', 'champions league'
-];
+const ALL_RELEVANT_KEYWORDS = [...KW_KEY_FIGURES, ...KW_PEREMOHA, ...KW_FREEZE, ...KW_ROTTEN, ...KW_ATTRITION, ...KW_CHAOS_RF, ...KW_CHAOS_UA, ...KW_GENERAL];
+const NEGATIVE_KEYWORDS = ['погода', 'weather', 'гороскоп', 'horoscope', 'футбол', 'football', 'концерт', 'concert', 'шоу-бізнес', 'show business', 'рецепт', 'recipe', 'схуднення', 'weight loss', 'знаки зодіаку', 'zodiac', 'мода', 'fashion', 'спорт', 'sport', 'матч', 'match', 'ліга чемпіонів', 'champions league'];
 
 const parser = new Parser();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// Функція перевірки (Фейс-контроль)
 function isRelevant(text: string): boolean {
   const lowerText = text.toLowerCase();
   if (NEGATIVE_KEYWORDS.some(word => lowerText.includes(word))) return false;
   return ALL_RELEVANT_KEYWORDS.some(keyword => lowerText.includes(keyword));
 }
 
-// Функція для отримання новин з NewsAPI
 async function fetchNewsAPIItems() {
   const apiKey = process.env.NEWS_API_KEY;
   if (!apiKey) return [];
@@ -149,7 +61,6 @@ async function fetchNewsAPIItems() {
   } catch (error) { return []; }
 }
 
-// Функція для завантаження RSS з тайм-аутом (щоб не виснув)
 async function fetchRSS(source: { name: string, url: string }) {
   try {
     const feed = await parser.parseURL(source.url);
@@ -160,53 +71,34 @@ async function fetchRSS(source: { name: string, url: string }) {
       sourceName: `${source.name} (RSS)`,
       pubDate: item.pubDate
     }));
-  } catch (e) {
-    console.error(`RSS Error (${source.name})`);
-    return [];
-  }
+  } catch (e) { return []; }
 }
 
-// --- MAIN FUNCTION ---
 export async function GET() {
   try {
     console.log('🚀 Parallel Cron Started...');
-
-    // 1. ПАРАЛЕЛЬНИЙ ЗБІР (RSS + API)
-    // Запускаємо всі запити одночасно
-    const tasks = [
-      ...RSS_SOURCES.map(source => fetchRSS(source)),
-      fetchNewsAPIItems()
-    ];
-    
+    const tasks = [...RSS_SOURCES.map(source => fetchRSS(source)), fetchNewsAPIItems()];
     const results = await Promise.all(tasks);
     const allNews = results.flat();
 
-    // 2. СОРТУВАННЯ (Найсвіжіші зверху)
     const sortedNews = allNews
       .sort((a, b) => new Date(b.pubDate || '').getTime() - new Date(a.pubDate || '').getTime())
-      // Беремо топ-40 новин для аналізу
       .slice(0, 40);
 
     let processedCount = 0;
 
-    // 3. ОБРОБКА ТА АНАЛІЗ
     for (const item of sortedNews) {
-      // Обробляємо максимум 3 новини за раз, щоб вкластися в ліміти Netlify Function (10 sec)
-      if (processedCount >= 3) break;
-
+      if (processedCount >= 2) break; 
       if (!item.link || !item.title) continue;
 
-      // Локальний фільтр
       const fullText = `${item.title} ${item.contentSnippet || ''}`;
       if (!isRelevant(fullText)) continue;
 
-      // Перевірка дублікатів в базі
       const { data: existing } = await supabase.from('news').select('id').eq('url', item.link).single();
       if (existing) continue;
 
       console.log(`⚡ Analyzing: [${item.sourceName}] ${item.title}`);
 
-      // --- AI PROMPT ---
       const systemPrompt = `
         You are a Lead Geopolitical Forecaster. Analyze the news item (using DIME framework) to update probabilities of 6 war scenarios for Ukraine (Pekar's Model).
         
@@ -219,21 +111,15 @@ export async function GET() {
         6. Chaos UA (Collapse of Ukraine)
 
         ### RULES:
-        - **Economy Focus:** If news mentions budget deficit, tax hikes, or ruble collapse in Russia -> increase "Visnazhennya" and "Chaos RF".
-        - **Filter:** Discard propaganda. Score based on concrete actions vs words.
-        - **Context:** Trump/Vance statements on "peace" usually increase "Rotten Deal" or "Freeze". Aid packages increase "Victory".
-
-        ### OUTPUT (JSON):
-        {
-          "summary": "Analytic summary in Ukrainian (max 1 sentence).",
-          "scores": { "peremoha": 0, "zamorozhennya": 0, "gnyla_ugoda": 0, "visnazhennya": 0, "chaos_rf": 0, "chaos_ua": 0 }
-        }
+        - Economy Focus: Budget deficit, tax hikes in RF -> increase "Visnazhennya" and "Chaos RF".
+        - Filter: Discard propaganda. Score based on concrete actions vs words.
+        - Output JSON: { "summary": "...", "scores": { "peremoha": 0, "zamorozhennya": 0, "gnyla_ugoda": 0, "visnazhennya": 0, "chaos_rf": 0, "chaos_ua": 0 } }
       `;
 
       const completion = await openai.chat.completions.create({
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: `SOURCE: ${item.sourceName}\nTITLE: ${item.title}\nCONTENT: ${item.contentSnippet}` },
+          { role: "user", content: `Title: ${item.title}\nContext: ${item.contentSnippet}` },
         ],
         model: "gpt-4o-mini",
         temperature: 0.1,
@@ -245,7 +131,7 @@ export async function GET() {
 
       await supabase.from('news').insert([{
         date: new Date().toISOString(),
-        source: item.sourceName,
+        source: `${item.sourceName}`,
         title: item.title,
         url: item.link,
         summary: aiResponse.summary,
@@ -255,16 +141,4 @@ export async function GET() {
       processedCount++;
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      processed: processedCount, 
-      message: processedCount > 0 ? 'News added' : 'No new relevant news' 
-    });
-
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-}
-```
-
-Тепер ти можеш сміливо заливати цей код. Всі списки на місці, логіка паралельна, аналіз глибокий.
+    return NextResponse.json({ success: true

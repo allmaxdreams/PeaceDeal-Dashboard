@@ -5,19 +5,8 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
 
-// Визначаємо простий тип для даних, щоб TypeScript не сварився
-type ChartData = {
-  date: string;
-  peremoha: number;
-  zamorozhennya: number;
-  gnyla_ugoda: number;
-  visnazhennya: number;
-  chaos_rf: number;
-  chaos_ua: number;
-};
-
 type ChartProps = {
-  data: any[]; // Використовуємо any для гнучкості, або ChartData[]
+  data: any[]; 
 };
 
 const COLORS = {
