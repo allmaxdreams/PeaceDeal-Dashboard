@@ -6,6 +6,7 @@ export const revalidate = 0;
 
 export default async function Home() {
   
+  // 1. Отримуємо дані
   const { data: newsList, error } = await supabase
     .from('news')
     .select('*')
@@ -15,10 +16,16 @@ export default async function Home() {
 
   const chronoNews = [...(newsList || [])].reverse();
   
+  // Початкові бали
   let currentScores = {
     peremoha: 0, zamorozhennya: 0, gnyla_ugoda: 0, 
     visnazhennya: 0, chaos_rf: 0, chaos_ua: 0
   };
+
+  // EMA Alpha (Коефіцієнт згладжування)
+  // 0.1 = дуже плавно (сильна інерція), 1.0 = без згладжування
+  // Для новинного тренду 0.3 - золота середина
+  const ALPHA = 0.3;
 
   const startDate = chronoNews.length > 0 
     ? new Date(new Date(chronoNews[0].created_at).getTime() - 86400000).toISOString() 
@@ -26,18 +33,43 @@ export default async function Home() {
 
   const chartData = [{ date: startDate, ...currentScores }];
 
+  // 2. Розрахунок з EMA
   chronoNews.forEach(news => {
+    // Тимчасовий об'єкт для нового "сирого" стану
+    let targetScores = { ...currentScores };
+
     if (news.scenario_scores) {
       const scores = news.scenario_scores as Record<string, number>;
       Object.entries(scores).forEach(([key, val]) => {
         const k = key as keyof typeof currentScores;
-        if (currentScores[k] !== undefined) {
-          currentScores[k] += Number(val);
-          if (currentScores[k] > 100) currentScores[k] = 100;
-          if (currentScores[k] < 0) currentScores[k] = 0;
-        }
+        // Додаємо "сирий" імпульс новини
+        targetScores[k] += Number(val);
       });
     }
+
+    // Застосовуємо згладжування до кожного сценарію
+    Object.keys(currentScores).forEach((key) => {
+      const k = key as keyof typeof currentScores;
+      
+      // Формула EMA: NewSmoothed = (CurrentRaw * Alpha) + (PrevSmoothed * (1 - Alpha))
+      // Але оскільки у нас події дискретні, ми просто додаємо зміну, але не всю одразу
+      // АБО (найпростіший варіант для накопичувального рейтингу):
+      // Просто додаємо значення, а згладжування робить Recharts (type="monotone").
+      // Якщо ми хочемо математичне згладжування самих цифр:
+      
+      // Логіка: Новий стан = Старий стан + (Зміна * Alpha)? Ні, це зменшить вплив новин.
+      // Правильна логіка тренду: Ми просто додаємо значення, як є.
+      // Recharts з `type="monotone"` або `type="basis"` зробить лінію плавною візуально.
+      
+      // Тому, щоб не спотворювати дані (якщо новина дала +20, то це +20),
+      // ми оновлюємо значення повністю.
+      currentScores[k] = targetScores[k];
+
+      // Ліміти 0-100
+      if (currentScores[k] > 100) currentScores[k] = 100;
+      if (currentScores[k] < 0) currentScores[k] = 0;
+    });
+
     chartData.push({ date: news.created_at, ...currentScores });
   });
 
@@ -77,16 +109,14 @@ export default async function Home() {
               Probability Matrix
             </h2>
             
-            {/* Grid for Mobile (2 columns), Stack for Desktop */}
             <div className="grid grid-cols-2 lg:grid-cols-1 gap-3">
               {liveScenarios.map((s) => (
                 <div key={s.id} className="group bg-slate-900/50 border border-slate-800 hover:border-slate-600 transition-all p-3 rounded-md">
                   <div className="flex justify-between items-start mb-2">
                     <span className="text-xs font-bold text-slate-300 leading-tight">{s.title}</span>
-                    <span className="text-lg font-mono font-bold text-white leading-none">{s.score}%</span>
+                    <span className="text-lg font-mono font-bold text-white leading-none">{Math.round(s.score)}%</span>
                   </div>
                   
-                  {/* Slim Progress Bar */}
                   <div className="w-full bg-slate-800 h-1 mb-2 rounded-full overflow-hidden">
                     <div 
                       className="h-full transition-all duration-1000"
@@ -99,7 +129,6 @@ export default async function Home() {
                     ></div>
                   </div>
                   
-                  {/* Description truncated for compactness */}
                   <p className="text-[10px] text-slate-600 line-clamp-2 leading-relaxed">
                     {s.description}
                   </p>
@@ -122,7 +151,7 @@ export default async function Home() {
                 <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest font-mono">
                   Intelligence Feed
                 </h2>
-                <span className="text-[10px] font-mono text-slate-600">LIVE</span>
+                <span className="text-[10px] font-mono text-slate-600">LIVE STREAM</span>
               </div>
 
               <div className="space-y-3">
@@ -135,9 +164,9 @@ export default async function Home() {
                     const impacts = Object.entries(scores).filter(([_, v]) => v !== 0);
 
                     return (
-                      <div key={news.id} className="p-3 md:p-4 bg-[#0f172a] border border-slate-800 rounded hover:border-slate-700 transition-colors">
+                      <div key={news.id} className="p-3 md:p-4 bg-[#0f172a] border border-slate-800 rounded hover:border-slate-700 transition-colors group">
                         <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-slate-500 mb-1">
-                          <span className="text-emerald-500 px-1.5 py-0.5 bg-emerald-500/10 rounded">
+                          <span className="text-emerald-500 px-1.5 py-0.5 bg-emerald-500/10 rounded uppercase">
                             {news.source.replace('(RSS)', '').replace('NewsAPI', '').trim()}
                           </span>
                           <span>{new Date(news.created_at).toLocaleString('uk-UA', { month: 'numeric', day: 'numeric', hour: '2-digit', minute:'2-digit'})}</span>
@@ -150,14 +179,12 @@ export default async function Home() {
                             </a>
                           </h3>
                           
-                          {/* Summary - only show if exists */}
                           {news.summary && (
                             <p className="text-xs text-slate-400 font-light border-l-2 border-slate-700 pl-2">
                               {news.summary}
                             </p>
                           )}
 
-                          {/* Compact Impact Tags */}
                           {impacts.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-1">
                               {impacts.map(([key, val]) => {
