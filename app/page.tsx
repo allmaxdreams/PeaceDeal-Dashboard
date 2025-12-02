@@ -15,10 +15,7 @@ export default async function Home() {
 
   if (error) console.error("DB Error:", error);
 
-  // Хронологічний порядок (від старого до нового)
   const chronoNews = [...(newsList || [])].reverse();
-  
-  // --- КОНФІГУРАЦІЯ МАТЕМАТИКИ ---
   
   // Стартові значення (База)
   const BASELINES = scenarios.reduce((acc, s) => {
@@ -26,70 +23,63 @@ export default async function Home() {
     return acc;
   }, {} as Record<string, number>);
 
-  // Поточні значення (починаємо з бази)
   let currentScores = { ...BASELINES };
 
-  // Швидкість повернення до реальності (Decay Rate)
-  // 0.005 = 0.5% повернення до бази за кожну годину тиші.
-  // За добу тиші графік зміститься на ~12% у бік базового сценарію.
-  const DECAY_RATE_PER_HOUR = 0.005;
+  // Коефіцієнт повернення до бази (чим більше, тим швидше графік "забуває" старі новини)
+  const DECAY_RATE_PER_HOUR = 0.01; 
 
   const startDate = chronoNews.length > 0 
-    ? new Date(new Date(chronoNews[0].created_at).getTime() - 3600000).toISOString() // -1 година
+    ? new Date(new Date(chronoNews[0].created_at).getTime() - 3600000).toISOString() 
     : new Date().toISOString();
 
   const chartData = [{ date: startDate, ...currentScores }];
   
-  // Змінна для відстеження часу попередньої події
   let lastEventTime = new Date(startDate).getTime();
 
-  // 2. РОЗРАХУНОК (Time-Weighted Mean Reversion)
+  // 2. РОЗРАХУНОК
   chronoNews.forEach(news => {
     const currentEventTime = new Date(news.created_at).getTime();
-    
-    // Скільки годин пройшло з минулої новини?
     const hoursPassed = (currentEventTime - lastEventTime) / (1000 * 60 * 60);
-    
-    // Оновлюємо час
     lastEventTime = currentEventTime;
 
-    // КРОК А: "Дрейф" до бази (Mean Reversion) за час тиші
-    // Якщо пройшло багато часу, графік плавно сповзає до BASELINES
+    // КРОК A: Дрейф до бази (Mean Reversion)
     Object.keys(currentScores).forEach((key) => {
         const k = key as keyof typeof currentScores;
         const baseline = BASELINES[k];
         const current = currentScores[k];
         
-        // Формула: Current = Current + (Target - Current) * (Rate * Time)
-        // Це лінійна інтерполяція (Lerp) залежно від часу
         let drift = (baseline - current) * (DECAY_RATE_PER_HOUR * hoursPassed);
+        // Захист від перельоту
+        if (Math.abs(drift) > Math.abs(baseline - current)) drift = baseline - current;
         
-        // Захист від "перельоту" (якщо дуже велика пауза)
-        if (Math.abs(drift) > Math.abs(baseline - current)) {
-            drift = baseline - current;
-        }
-
         currentScores[k] += drift;
     });
 
-    // КРОК Б: Вплив самої новини (Impact)
+    // КРОК B: Вплив новини
     if (news.scenario_scores) {
       const scores = news.scenario_scores as Record<string, number>;
       Object.entries(scores).forEach(([key, val]) => {
         const k = key as keyof typeof currentScores;
         if (currentScores[k] !== undefined) {
-          // Просто додаємо вплив (адже згладжування по часу ми вже зробили вище)
+          // Додаємо вплив
           currentScores[k] += Number(val);
+          // Не даємо піти в мінус перед нормалізацією
+          if (currentScores[k] < 0) currentScores[k] = 0; 
         }
       });
     }
 
-    // КРОК В: Жорсткі ліміти (Clamping)
-    Object.keys(currentScores).forEach((key) => {
+    // КРОК C: НОРМАЛІЗАЦІЯ (Головний Фікс!)
+    // Сума всіх сценаріїв має бути 100%. Якщо вийшло 150%, ми пропорційно зменшуємо всі.
+    const totalScore = Object.values(currentScores).reduce((acc, score) => acc + score, 0);
+    
+    if (totalScore > 0) {
+      Object.keys(currentScores).forEach(key => {
         const k = key as keyof typeof currentScores;
-        if (currentScores[k] > 100) currentScores[k] = 100;
-        if (currentScores[k] < 0) currentScores[k] = 0;
-    });
+        // Формула: (ПоточнийБал / ЗагальнуСуму) * 100
+        currentScores[k] = (currentScores[k] / totalScore) * 100;
+      });
+    }
 
     // Зберігаємо точку
     let point = { date: news.created_at } as any;
@@ -107,7 +97,6 @@ export default async function Home() {
 
   return (
     <main className="min-h-screen bg-[#0b1120] text-slate-300 font-sans flex flex-col">
-      {/* HEADER */}
       <nav className="border-b border-slate-800 bg-[#0f172a]/90 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -121,7 +110,7 @@ export default async function Home() {
           </div>
           
           <div className="flex gap-4 items-center">
-            <MethodologyModal /> 
+            <MethodologyModal />
             <div className="hidden sm:flex gap-2 text-[10px] font-mono text-slate-500">
               <div className="px-2 py-1 bg-slate-900 rounded border border-slate-800">
                 EVENTS: {newsList?.length || 0}
@@ -136,9 +125,11 @@ export default async function Home() {
 
       <div className="max-w-7xl mx-auto p-4 lg:p-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          
+          {/* MATRIX */}
           <div className="lg:col-span-4 space-y-3">
             <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest font-mono mb-2">
-              МАТРИЦЯ ЙМОВІРНОСТЕЙ (BASELINE DRIFT)
+              МАТРИЦЯ ЙМОВІРНОСТЕЙ
             </h2>
             <div className="grid grid-cols-2 lg:grid-cols-1 gap-3">
               {liveScenarios.map((s) => (
@@ -152,7 +143,9 @@ export default async function Home() {
                       className="h-full transition-all duration-1000"
                       style={{ 
                         width: `${s.score}%`,
-                        backgroundColor: s.id === 'peremoha' ? '#4ade80' : s.id === 'chaos_rf' ? '#f87171' : s.id === 'zamorozhennya' ? '#3b82f6' : '#94a3b8' 
+                        backgroundColor: s.id === 'peremoha' ? '#4ade80' : 
+                                       s.id === 'chaos_rf' ? '#f87171' : 
+                                       s.id === 'zamorozhennya' ? '#3b82f6' : '#94a3b8' 
                       }}
                     ></div>
                   </div>
@@ -164,6 +157,7 @@ export default async function Home() {
             </div>
           </div>
 
+          {/* CHART & FEED */}
           <div className="lg:col-span-8 space-y-6">
             <section className="bg-slate-900/50 border border-slate-800 rounded-lg p-1">
                <ScenarioChart data={chartData} />
@@ -179,7 +173,7 @@ export default async function Home() {
 
               <div className="space-y-3">
                 {(!newsList || newsList.length === 0) && (
-                  <p className="text-center text-slate-600 font-mono text-xs py-8">Waiting for data stream...</p>
+                  <p className="text-center text-slate-600 font-mono text-xs py-8">Initializing data stream...</p>
                 )}
                 
                 {newsList?.map((news) => {
