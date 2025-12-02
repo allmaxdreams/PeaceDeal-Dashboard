@@ -22,7 +22,7 @@ const RSS_SOURCES = [
   { name: 'CNBC', url: 'https://www.cnbc.com/id/100727362/device/rss/rss.html' }
 ];
 
-// 2. КЛЮЧОВІ СЛОВА (ПОВНИЙ СПИСОК)
+// 2. КЛЮЧОВІ СЛОВА
 const KW_KEY_FIGURES = ['зеленський', 'zelensky', 'єрмак', 'yermak', 'кулеба', 'kuleba', 'сибіга', 'sybiha', 'залужний', 'zaluzhnyi', 'сирський', 'syrskyi', 'трамп', 'trump', 'байден', 'biden', 'рубіо', 'rubio', 'венс', 'vance', 'хегсет', 'hegseth', 'кушнер', 'kushner', 'макрон', 'macron', 'стармер', 'starmer', 'шольц', 'scholz', 'мерц', 'merz', 'дуда', 'duda', 'орбан', 'orban', 'фон дер ляєн', 'von der leyen', 'рютте', 'rutte', 'путін', 'putin', 'лавров', 'lavrov', 'пєсков', 'peskov'];
 const KW_PEREMOHA = ['кордони 1991', 'borders 1991', 'вступ до нато', 'nato accession', 'вступ до єс', 'eu accession', 'репарації', 'reparations', 'трибунал', 'tribunal', 'демілітаризація', 'demilitarization', 'розпад рф', 'collapse of russia', 'перемога', 'victory', 'звільнення', 'liberation'];
 const KW_FREEZE = ['припинення вогню', 'ceasefire', 'лінія розмежування', 'contact line', 'корейський сценарій', 'korean scenario', 'замороження конфлікту', 'frozen conflict', 'мінськ-3', 'minsk-3', 'перемир\'я', 'truce', 'статус-кво', 'status quo'];
@@ -76,7 +76,6 @@ async function fetchRSS(source: { name: string, url: string }) {
 
 export async function GET() {
   try {
-    console.log('🚀 Parallel Cron Started...');
     const tasks = [...RSS_SOURCES.map(source => fetchRSS(source)), fetchNewsAPIItems()];
     const results = await Promise.all(tasks);
     const allNews = results.flat();
@@ -97,23 +96,9 @@ export async function GET() {
       const { data: existing } = await supabase.from('news').select('id').eq('url', item.link).single();
       if (existing) continue;
 
-      console.log(`⚡ Analyzing: [${item.sourceName}] ${item.title}`);
-
       const systemPrompt = `
         You are a Lead Geopolitical Forecaster. Analyze the news item (using DIME framework) to update probabilities of 6 war scenarios for Ukraine (Pekar's Model).
-        
-        ### SCENARIOS:
-        1. Peremoha (Victory 1991 borders)
-        2. Zamorozhennya (Freeze/Ceasefire)
-        3. Gnyla Ugoda (Rotten Deal/Capitulation)
-        4. Visnazhennya (Attrition War)
-        5. Chaos RF (Collapse of Russia)
-        6. Chaos UA (Collapse of Ukraine)
-
-        ### RULES:
-        - Economy Focus: Budget deficit, tax hikes in RF -> increase "Visnazhennya" and "Chaos RF".
-        - Filter: Discard propaganda. Score based on concrete actions vs words.
-        - Output JSON: { "summary": "...", "scores": { "peremoha": 0, "zamorozhennya": 0, "gnyla_ugoda": 0, "visnazhennya": 0, "chaos_rf": 0, "chaos_ua": 0 } }
+        Output JSON: { "summary": "...", "scores": { "peremoha": 0, "zamorozhennya": 0, "gnyla_ugoda": 0, "visnazhennya": 0, "chaos_rf": 0, "chaos_ua": 0 } }
       `;
 
       const completion = await openai.chat.completions.create({
@@ -141,4 +126,8 @@ export async function GET() {
       processedCount++;
     }
 
-    return NextResponse.json({ success: true
+    return NextResponse.json({ success: true, processed: processedCount });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}
