@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import ScenarioChart from './ScenarioChart';
-import MethodologyModal from './MethodologyModal';
+import { dictionary } from '../lib/dictionary'; // Імпорт словника
 
 type DashboardProps = {
   newsList: any[];
@@ -12,63 +12,91 @@ type DashboardProps = {
 
 export default function DashboardClient({ newsList, chartData, scenarios }: DashboardProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [lang, setLang] = useState<'ua' | 'en'>('ua'); // Стан мови
+
+  const t = dictionary[lang]; // Поточний переклад
 
   // Фільтрація новин
   const filteredNews = selectedId 
     ? newsList.filter(news => {
         const scores = news.scenario_scores || {};
-        // Показуємо новину, тільки якщо вона вплинула на вибраний сценарій (не 0)
         return scores[selectedId] && scores[selectedId] !== 0;
       })
     : newsList;
 
-  // Обробка кліку на картку
   const handleCardClick = (id: string) => {
-    if (selectedId === id) {
-      setSelectedId(null); // Зняти вибір при повторному кліку
-    } else {
-      setSelectedId(id);
-    }
+    if (selectedId === id) setSelectedId(null);
+    else setSelectedId(id);
   };
 
+  // Компонент модального вікна (вбудований для доступу до state мови)
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
   return (
-    <main className="min-h-screen bg-[#0b1120] text-slate-300 font-sans">
-      {/* Top Navigation Bar */}
-      <nav className="border-b border-slate-800 bg-[#0f172a]/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+    <main className="min-h-screen bg-[#0b1120] text-slate-300 font-sans flex flex-col">
+      
+      {/* --- HEADER --- */}
+      <nav className="border-b border-slate-800 bg-[#0f172a]/90 backdrop-blur-md sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+          
+          {/* Logo */}
+          <div className="flex items-center gap-3 cursor-pointer" onClick={() => setSelectedId(null)}>
             <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]"></div>
-            <h1 className="text-lg font-bold text-slate-100 tracking-tight font-mono cursor-pointer" onClick={() => setSelectedId(null)}>
-              PEACEDEAL<span className="text-slate-600">.AI</span>
-            </h1>
+            <div className="flex flex-col">
+              <h1 className="text-lg font-bold text-slate-100 tracking-tight font-mono leading-none">
+                {t.title}<span className="text-slate-600">.AI</span>
+              </h1>
+              <span className="text-[9px] text-slate-500 font-mono tracking-widest">{t.subtitle}</span>
+            </div>
           </div>
           
+          {/* Right Controls */}
           <div className="flex gap-4 items-center">
-            <MethodologyModal />
-            <div className="hidden sm:flex gap-4 text-[10px] font-mono text-slate-500">
+            {/* Lang Switcher */}
+            <div className="flex border border-slate-700 rounded overflow-hidden">
+              <button 
+                onClick={() => setLang('ua')}
+                className={`px-2 py-1 text-[10px] font-mono transition-colors ${lang === 'ua' ? 'bg-slate-700 text-white' : 'bg-slate-900 text-slate-500 hover:text-slate-300'}`}
+              >
+                UA
+              </button>
+              <button 
+                onClick={() => setLang('en')}
+                className={`px-2 py-1 text-[10px] font-mono transition-colors ${lang === 'en' ? 'bg-slate-700 text-white' : 'bg-slate-900 text-slate-500 hover:text-slate-300'}`}
+              >
+                EN
+              </button>
+            </div>
+
+            <button 
+              onClick={() => setIsModalOpen(true)}
+              className="hidden md:block px-3 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-slate-500 rounded text-[10px] font-mono text-slate-400 transition-all tracking-wider"
+            >
+              {t.methodologyBtn}
+            </button>
+
+            <div className="hidden sm:flex gap-2 text-[10px] font-mono text-slate-500">
               <div className="px-2 py-1 bg-slate-900 rounded border border-slate-800">
-                EVENTS: {newsList?.length || 0}
-              </div>
-              <div className="px-2 py-1 bg-slate-900 rounded border border-slate-800 text-emerald-500">
-                SYS: ONLINE
+                {t.events}: {newsList?.length || 0}
               </div>
             </div>
           </div>
         </div>
       </nav>
 
-      <div className="max-w-7xl mx-auto p-4 lg:p-6">
+      {/* --- CONTENT --- */}
+      <div className="flex-grow max-w-7xl w-full mx-auto p-4 lg:p-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
-          {/* LEFT COLUMN: SCENARIOS */}
+          {/* LEFT: SCENARIOS */}
           <div className="lg:col-span-4 space-y-3">
             <div className="flex justify-between items-center mb-2">
                <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest font-mono">
-                 Probability Matrix {selectedId && '(FILTERED)'}
+                 {t.matrixTitle}
                </h2>
                {selectedId && (
                  <button onClick={() => setSelectedId(null)} className="text-[10px] text-blue-400 hover:underline">
-                   RESET VIEW
+                   RESET
                  </button>
                )}
             </div>
@@ -77,6 +105,8 @@ export default function DashboardClient({ newsList, chartData, scenarios }: Dash
               {scenarios.map((s) => {
                 const isActive = selectedId === s.id;
                 const isDimmed = selectedId && !isActive;
+                // Переклад сценарію
+                const translated = t.scenarios[s.id as keyof typeof t.scenarios];
 
                 return (
                   <div 
@@ -89,7 +119,9 @@ export default function DashboardClient({ newsList, chartData, scenarios }: Dash
                     `}
                   >
                     <div className="flex justify-between items-start mb-2">
-                      <span className={`text-xs font-bold leading-tight ${isActive ? 'text-white' : 'text-slate-300'}`}>{s.title}</span>
+                      <span className={`text-xs font-bold leading-tight ${isActive ? 'text-white' : 'text-slate-300'}`}>
+                        {translated ? translated.title : s.title}
+                      </span>
                       <span className="text-lg font-mono font-bold text-white leading-none">{s.score}%</span>
                     </div>
                     
@@ -98,15 +130,13 @@ export default function DashboardClient({ newsList, chartData, scenarios }: Dash
                         className="h-full transition-all duration-1000"
                         style={{ 
                           width: `${s.score}%`,
-                          backgroundColor: s.id === 'peremoha' ? '#4ade80' : 
-                                         s.id === 'chaos_rf' ? '#f87171' : 
-                                         s.id === 'zamorozhennya' ? '#3b82f6' : '#94a3b8' 
+                          backgroundColor: s.id === 'peremoha' ? '#4ade80' : s.id === 'chaos_rf' ? '#f87171' : s.id === 'zamorozhennya' ? '#3b82f6' : '#94a3b8' 
                         }}
                       ></div>
                     </div>
                     
                     <p className="text-[10px] text-slate-600 line-clamp-2 leading-relaxed">
-                      {s.description}
+                      {translated ? translated.desc : s.description}
                     </p>
                   </div>
                 );
@@ -114,19 +144,16 @@ export default function DashboardClient({ newsList, chartData, scenarios }: Dash
             </div>
           </div>
 
-          {/* RIGHT COLUMN */}
+          {/* RIGHT: CHART & FEED */}
           <div className="lg:col-span-8 space-y-6">
-            
-            {/* CHART */}
             <section className="bg-slate-900/50 border border-slate-800 rounded-lg p-1">
                <ScenarioChart data={chartData} selectedId={selectedId} />
             </section>
 
-            {/* FEED */}
             <section>
               <div className="flex justify-between items-end mb-3 border-b border-slate-800 pb-2">
                 <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest font-mono">
-                  {selectedId ? `Intel Feed: ${selectedId.toUpperCase()}` : 'Intelligence Feed: ALL'}
+                  {selectedId ? `${t.feedTitle}: ${selectedId.toUpperCase()}` : t.feedTitle}
                 </h2>
                 <span className="text-[10px] font-mono text-slate-600">{filteredNews.length} ITEMS</span>
               </div>
@@ -134,7 +161,7 @@ export default function DashboardClient({ newsList, chartData, scenarios }: Dash
               <div className="space-y-3">
                 {filteredNews.length === 0 && (
                   <p className="text-center text-slate-600 font-mono text-xs py-8">
-                    No relevant events found for this scenario yet.
+                    {t.feedWaiting}
                   </p>
                 )}
                 
@@ -157,31 +184,25 @@ export default function DashboardClient({ newsList, chartData, scenarios }: Dash
                               {news.title}
                             </a>
                           </h3>
-                          
                           {news.summary && (
                             <p className="text-xs text-slate-400 font-light border-l-2 border-slate-700 pl-2">
                               {news.summary}
                             </p>
                           )}
-
                           <div className="flex flex-wrap gap-1 mt-1">
                             {impacts.length > 0 ? (
                               impacts.map(([key, val]) => {
-                                const label = scenarios.find(s => s.id === key)?.title || key;
+                                const label = t.scenarios[key as keyof typeof t.scenarios]?.title || key;
                                 const isPos = val > 0;
-                                // Підсвічуємо тільки тег вибраного сценарію, якщо фільтр активний
-                                const isRelevantTag = !selectedId || selectedId === key;
-                                const opacityClass = isRelevantTag ? 'opacity-100' : 'opacity-30';
-
                                 return (
-                                  <span key={key} className={`inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono rounded border ${isPos ? 'border-emerald-900/50 bg-emerald-900/10 text-emerald-400' : 'border-rose-900/50 bg-rose-900/10 text-rose-400'} ${opacityClass}`}>
+                                  <span key={key} className={`inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono rounded border ${isPos ? 'border-emerald-900/50 bg-emerald-900/10 text-emerald-400' : 'border-rose-900/50 bg-rose-900/10 text-rose-400'}`}>
                                     {label} {isPos ? '↑' : '↓'}{Math.abs(val)}
                                   </span>
                                 );
                               })
                             ) : (
                               <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono rounded border border-slate-700 bg-slate-800 text-slate-500">
-                                NEUTRAL
+                                {t.neutral}
                               </span>
                             )}
                           </div>
@@ -192,9 +213,53 @@ export default function DashboardClient({ newsList, chartData, scenarios }: Dash
               </div>
             </section>
           </div>
-
         </div>
       </div>
+
+      {/* --- FOOTER --- */}
+      <footer className="border-t border-slate-800 bg-[#0f172a] mt-12 py-6">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center text-[10px] font-mono text-slate-500">
+          <div>
+            © 2025 PEACEDEAL.AI // KYIV, UKRAINE
+          </div>
+          <div className="flex items-center gap-2 mt-2 md:mt-0">
+            {t.footer} <a href="https://www.linkedin.com/in/allmaxdreams/" target="_blank" rel="noopener noreferrer" className="text-slate-300 hover:text-emerald-400 transition-colors">MAKSYM KUZMENKO</a>
+          </div>
+        </div>
+      </footer>
+
+      {/* --- MODAL --- */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm" onClick={() => setIsModalOpen(false)}>
+          <div className="bg-[#0b1120] border border-slate-700 w-full max-w-3xl max-h-[85vh] rounded-lg shadow-2xl overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="p-6 border-b border-slate-800 flex justify-between items-center bg-slate-900/50">
+              <h2 className="text-xl font-bold text-slate-100 font-mono tracking-tight">{t.methodologyTitle}</h2>
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-500 hover:text-white">✕</button>
+            </div>
+            <div className="p-6 overflow-y-auto space-y-6 text-sm text-slate-400 font-sans leading-relaxed custom-scrollbar">
+              <p className="text-base text-slate-200 font-medium border-b border-slate-800 pb-4">{t.modal.intro}</p>
+              
+              <section>
+                <h3 className="text-emerald-400 font-bold font-mono text-xs mb-2 uppercase">{t.modal.p1_title}</h3>
+                <p>{t.modal.p1_text}</p>
+              </section>
+              <section>
+                <h3 className="text-emerald-400 font-bold font-mono text-xs mb-2 uppercase">{t.modal.p2_title}</h3>
+                <p>{t.modal.p2_text}</p>
+              </section>
+              <section>
+                <h3 className="text-emerald-400 font-bold font-mono text-xs mb-2 uppercase">{t.modal.p3_title}</h3>
+                <p>{t.modal.p3_text}</p>
+              </section>
+            </div>
+            <div className="p-4 border-t border-slate-800 bg-slate-900/50 text-center">
+              <button onClick={() => setIsModalOpen(false)} className="px-8 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded text-xs tracking-widest transition-colors font-mono">
+                {t.ackButton}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
