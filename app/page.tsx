@@ -23,13 +23,11 @@ export default async function Home() {
     visnazhennya: 0, chaos_rf: 0, chaos_ua: 0
   };
 
-  // --- ВАЖЛИВО: Створюємо стартову точку (Нульовий кілометр) ---
-  // Беремо дату першої новини і віднімаємо 1 день, або просто ставимо "Start"
+  // Стартова точка
   const startDate = chronoNews.length > 0 
     ? new Date(new Date(chronoNews[0].created_at).getTime() - 86400000).toISOString() 
     : new Date().toISOString();
 
-  // Масив починається з нулів
   const chartData = [
     { date: startDate, ...currentScores } 
   ];
@@ -37,17 +35,18 @@ export default async function Home() {
   // Наповнюємо даними
   chronoNews.forEach(news => {
     if (news.scenario_scores) {
-      Object.entries(news.scenario_scores).forEach(([key, val]) => {
+      // TypeScript Fix: Явно кажемо, що це об'єкт з числами
+      const scores = news.scenario_scores as Record<string, number>;
+      
+      Object.entries(scores).forEach(([key, val]) => {
         const k = key as keyof typeof currentScores;
         if (currentScores[k] !== undefined) {
           currentScores[k] += Number(val);
-          // Обмежуємо 0-100%
           if (currentScores[k] > 100) currentScores[k] = 100;
           if (currentScores[k] < 0) currentScores[k] = 0;
         }
       });
     }
-    // Додаємо нову точку після зміни
     chartData.push({ date: news.created_at, ...currentScores });
   });
 
@@ -95,7 +94,9 @@ export default async function Home() {
         <h2 className="text-2xl font-bold text-slate-800 mb-4 border-b pb-2">Останні події</h2>
         <div className="space-y-4">
           {newsList?.map((news) => {
-             const impacts = news.scenario_scores ? Object.entries(news.scenario_scores).filter(([_, v]) => v !== 0) : [];
+             // TypeScript Fix: Явно кажемо, що це об'єкт з числами
+             const scores = (news.scenario_scores || {}) as Record<string, number>;
+             const impacts = Object.entries(scores).filter(([_, v]) => v !== 0);
              
              return (
               <div key={news.id} className="bg-white p-5 rounded-lg shadow-sm border border-slate-200">
@@ -115,7 +116,7 @@ export default async function Home() {
                 <div className="flex flex-wrap gap-2">
                   {impacts.map(([key, val]) => {
                     const label = liveScenarios.find(s => s.id === key)?.title || key;
-                    const isPos = Number(val) > 0;
+                    const isPos = val > 0;
                     return (
                       <span key={key} className={`text-xs px-2 py-1 rounded font-bold border ${isPos ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
                         {label}: {isPos ? '+' : ''}{val}
