@@ -1,7 +1,7 @@
 import { scenarios } from './lib/data';
 import { supabase } from './lib/supabase';
 import ScenarioChart from './components/ScenarioChart';
-import MethodologyModal from './components/MethodologyModal'; // Переконайся, що імпорт є
+import MethodologyModal from './components/MethodologyModal';
 
 export const revalidate = 0;
 
@@ -17,65 +17,46 @@ export default async function Home() {
 
   const chronoNews = [...(newsList || [])].reverse();
   
-  // Початкові бали
-  let currentScores = {
-    peremoha: 0, zamorozhennya: 0, gnyla_ugoda: 0, 
-    visnazhennya: 0, chaos_rf: 0, chaos_ua: 0
-  };
+  // --- ВИПРАВЛЕННЯ ТУТ ---
+  // Беремо стартові значення з файлу конфігурації (40, 30, 20...), а не нулі
+  let currentScores = scenarios.reduce((acc, s) => {
+    acc[s.id] = s.score;
+    return acc;
+  }, {} as Record<string, number>);
 
-  // EMA Alpha (Коефіцієнт згладжування)
-  // 0.1 = дуже плавно (сильна інерція), 1.0 = без згладжування
-  // Для новинного тренду 0.2-0.3 - оптимально
   const ALPHA = 0.3;
 
   const startDate = chronoNews.length > 0 
     ? new Date(new Date(chronoNews[0].created_at).getTime() - 86400000).toISOString() 
     : new Date().toISOString();
 
+  // Перша точка графіка вже буде мати правильні відсотки
   const chartData = [{ date: startDate, ...currentScores }];
 
-  // 2. Розрахунок з EMA (Adaptive Trend)
+  // 2. Розрахунок
   chronoNews.forEach(news => {
-    let impactScores = { ...currentScores }; // Копія для розрахунку "куди ми хочемо прийти"
+    let targetScores = { ...currentScores };
 
     if (news.scenario_scores) {
       const scores = news.scenario_scores as Record<string, number>;
-      
-      // Крок 1: Визначаємо "цільове" значення (куди штовхає новина)
-      // В нашій моделі новина дає ДЕЛЬТУ (+5), а не абсолютне значення.
-      // Тому "ціль" = поточне + дельта.
       Object.entries(scores).forEach(([key, val]) => {
         const k = key as keyof typeof currentScores;
-        // Сира зміна (Raw Delta)
-        let rawDelta = Number(val);
-        
-        // Застосовуємо EMA до самої ЗМІНИ (щоб не було різких стрибків на +50)
-        // НовеЗначення = Старе + (Дельта * Alpha)
-        // Це згладжує реакцію системи на шокові новини.
-        if (currentScores[k] !== undefined) {
-           let newScore = currentScores[k] + (rawDelta * ALPHA);
-           
-           // Обмежуємо 0-100
-           if (newScore > 100) newScore = 100;
-           if (newScore < 0) newScore = 0;
-           
-           currentScores[k] = newScore;
-        }
+        targetScores[k] += Number(val);
       });
     }
-    
-    // Зберігаємо точку для графіка
-    // Округляємо до 1 знаку для чистоти даних у JSON
-    let chartPoint = { date: news.created_at } as any;
-    Object.keys(currentScores).forEach(key => {
-        const k = key as keyof typeof currentScores;
-        chartPoint[k] = Number(currentScores[k].toFixed(1));
+
+    Object.keys(currentScores).forEach((key) => {
+      const k = key as keyof typeof currentScores;
+      // EMA logic
+      currentScores[k] = currentScores[k] * (1 - ALPHA) + targetScores[k] * ALPHA;
+
+      if (currentScores[k] > 100) currentScores[k] = 100;
+      if (currentScores[k] < 0) currentScores[k] = 0;
     });
-    
-    chartData.push(chartPoint);
+
+    chartData.push({ date: news.created_at, ...currentScores });
   });
 
-  // 3. Оновлюємо картки фінальними цифрами
   const liveScenarios = scenarios.map(s => ({
     ...s,
     score: Math.round(currentScores[s.id as keyof typeof currentScores] || 0)
@@ -83,7 +64,6 @@ export default async function Home() {
 
   return (
     <main className="min-h-screen bg-[#0b1120] text-slate-300 font-sans">
-      {/* Top Navigation Bar */}
       <nav className="border-b border-slate-800 bg-[#0f172a]/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -109,13 +89,10 @@ export default async function Home() {
 
       <div className="max-w-7xl mx-auto p-4 lg:p-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          
-          {/* LEFT COLUMN: SCENARIOS (Compact Matrix) */}
           <div className="lg:col-span-4 space-y-3">
             <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest font-mono mb-2">
               Probability Matrix
             </h2>
-            
             <div className="grid grid-cols-2 lg:grid-cols-1 gap-3">
               {liveScenarios.map((s) => (
                 <div key={s.id} className="group bg-slate-900/50 border border-slate-800 hover:border-slate-600 transition-all p-3 rounded-md">
@@ -123,7 +100,6 @@ export default async function Home() {
                     <span className="text-xs font-bold text-slate-300 leading-tight">{s.title}</span>
                     <span className="text-lg font-mono font-bold text-white leading-none">{s.score}%</span>
                   </div>
-                  
                   <div className="w-full bg-slate-800 h-1 mb-2 rounded-full overflow-hidden">
                     <div 
                       className="h-full transition-all duration-1000"
@@ -135,7 +111,6 @@ export default async function Home() {
                       }}
                     ></div>
                   </div>
-                  
                   <p className="text-[10px] text-slate-600 line-clamp-2 leading-relaxed">
                     {s.description}
                   </p>
@@ -144,15 +119,11 @@ export default async function Home() {
             </div>
           </div>
 
-          {/* RIGHT COLUMN: ANALYTICS (Chart + Feed) */}
           <div className="lg:col-span-8 space-y-6">
-            
-            {/* CHART SECTION */}
             <section className="bg-slate-900/50 border border-slate-800 rounded-lg p-1">
                <ScenarioChart data={chartData} />
             </section>
 
-            {/* FEED SECTION */}
             <section>
               <div className="flex justify-between items-end mb-3 border-b border-slate-800 pb-2">
                 <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest font-mono">
@@ -168,7 +139,6 @@ export default async function Home() {
                 
                 {newsList?.map((news) => {
                     const scores = (news.scenario_scores || {}) as Record<string, number>;
-                    // Фільтруємо нульові впливи
                     const impacts = Object.entries(scores).filter(([_, v]) => v !== 0);
 
                     return (
@@ -186,14 +156,11 @@ export default async function Home() {
                               {news.title}
                             </a>
                           </h3>
-                          
                           {news.summary && (
                             <p className="text-xs text-slate-400 font-light border-l-2 border-slate-700 pl-2">
                               {news.summary}
                             </p>
                           )}
-
-                          {/* Теги з впливом */}
                           <div className="flex flex-wrap gap-1 mt-1">
                             {impacts.length > 0 ? (
                               impacts.map(([key, val]) => {
@@ -207,7 +174,7 @@ export default async function Home() {
                               })
                             ) : (
                               <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono rounded border border-slate-700 bg-slate-800 text-slate-500">
-                                NEUTRAL IMPACT / NO SCORE CHANGE
+                                NEUTRAL IMPACT
                               </span>
                             )}
                           </div>
@@ -218,7 +185,6 @@ export default async function Home() {
               </div>
             </section>
           </div>
-
         </div>
       </div>
     </main>
