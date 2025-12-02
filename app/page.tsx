@@ -1,6 +1,7 @@
 import { scenarios } from './lib/data';
 import { supabase } from './lib/supabase';
 import ScenarioChart from './components/ScenarioChart';
+import MethodologyModal from './components/MethodologyModal'; // Переконайся, що імпорт є
 
 export const revalidate = 0;
 
@@ -24,7 +25,7 @@ export default async function Home() {
 
   // EMA Alpha (Коефіцієнт згладжування)
   // 0.1 = дуже плавно (сильна інерція), 1.0 = без згладжування
-  // Для новинного тренду 0.3 - золота середина
+  // Для новинного тренду 0.2-0.3 - оптимально
   const ALPHA = 0.3;
 
   const startDate = chronoNews.length > 0 
@@ -33,49 +34,51 @@ export default async function Home() {
 
   const chartData = [{ date: startDate, ...currentScores }];
 
-  // 2. Розрахунок з EMA
+  // 2. Розрахунок з EMA (Adaptive Trend)
   chronoNews.forEach(news => {
-    // Тимчасовий об'єкт для нового "сирого" стану
-    let targetScores = { ...currentScores };
+    let impactScores = { ...currentScores }; // Копія для розрахунку "куди ми хочемо прийти"
 
     if (news.scenario_scores) {
       const scores = news.scenario_scores as Record<string, number>;
+      
+      // Крок 1: Визначаємо "цільове" значення (куди штовхає новина)
+      // В нашій моделі новина дає ДЕЛЬТУ (+5), а не абсолютне значення.
+      // Тому "ціль" = поточне + дельта.
       Object.entries(scores).forEach(([key, val]) => {
         const k = key as keyof typeof currentScores;
-        // Додаємо "сирий" імпульс новини
-        targetScores[k] += Number(val);
+        // Сира зміна (Raw Delta)
+        let rawDelta = Number(val);
+        
+        // Застосовуємо EMA до самої ЗМІНИ (щоб не було різких стрибків на +50)
+        // НовеЗначення = Старе + (Дельта * Alpha)
+        // Це згладжує реакцію системи на шокові новини.
+        if (currentScores[k] !== undefined) {
+           let newScore = currentScores[k] + (rawDelta * ALPHA);
+           
+           // Обмежуємо 0-100
+           if (newScore > 100) newScore = 100;
+           if (newScore < 0) newScore = 0;
+           
+           currentScores[k] = newScore;
+        }
       });
     }
-
-    // Застосовуємо згладжування до кожного сценарію
-    Object.keys(currentScores).forEach((key) => {
-      const k = key as keyof typeof currentScores;
-      
-      // Формула EMA: NewSmoothed = (CurrentRaw * Alpha) + (PrevSmoothed * (1 - Alpha))
-      // Але оскільки у нас події дискретні, ми просто додаємо зміну, але не всю одразу
-      // АБО (найпростіший варіант для накопичувального рейтингу):
-      // Просто додаємо значення, а згладжування робить Recharts (type="monotone").
-      // Якщо ми хочемо математичне згладжування самих цифр:
-      
-      // Логіка: Новий стан = Старий стан + (Зміна * Alpha)? Ні, це зменшить вплив новин.
-      // Правильна логіка тренду: Ми просто додаємо значення, як є.
-      // Recharts з `type="monotone"` або `type="basis"` зробить лінію плавною візуально.
-      
-      // Тому, щоб не спотворювати дані (якщо новина дала +20, то це +20),
-      // ми оновлюємо значення повністю.
-      currentScores[k] = targetScores[k];
-
-      // Ліміти 0-100
-      if (currentScores[k] > 100) currentScores[k] = 100;
-      if (currentScores[k] < 0) currentScores[k] = 0;
+    
+    // Зберігаємо точку для графіка
+    // Округляємо до 1 знаку для чистоти даних у JSON
+    let chartPoint = { date: news.created_at } as any;
+    Object.keys(currentScores).forEach(key => {
+        const k = key as keyof typeof currentScores;
+        chartPoint[k] = Number(currentScores[k].toFixed(1));
     });
-
-    chartData.push({ date: news.created_at, ...currentScores });
+    
+    chartData.push(chartPoint);
   });
 
+  // 3. Оновлюємо картки фінальними цифрами
   const liveScenarios = scenarios.map(s => ({
     ...s,
-    score: currentScores[s.id as keyof typeof currentScores] || 0
+    score: Math.round(currentScores[s.id as keyof typeof currentScores] || 0)
   }));
 
   return (
@@ -89,12 +92,16 @@ export default async function Home() {
               PEACEDEAL<span className="text-slate-600">.AI</span>
             </h1>
           </div>
-          <div className="flex gap-4 text-[10px] font-mono text-slate-500">
-            <div className="hidden sm:block px-2 py-1 bg-slate-900 rounded border border-slate-800">
-              EVENTS: {newsList?.length || 0}
-            </div>
-            <div className="px-2 py-1 bg-slate-900 rounded border border-slate-800 text-emerald-500">
-              SYS: ONLINE
+          
+          <div className="flex gap-4 items-center">
+            <MethodologyModal />
+            <div className="hidden sm:flex gap-4 text-[10px] font-mono text-slate-500">
+              <div className="px-2 py-1 bg-slate-900 rounded border border-slate-800">
+                EVENTS: {newsList?.length || 0}
+              </div>
+              <div className="px-2 py-1 bg-slate-900 rounded border border-slate-800 text-emerald-500">
+                SYS: ONLINE
+              </div>
             </div>
           </div>
         </div>
@@ -114,7 +121,7 @@ export default async function Home() {
                 <div key={s.id} className="group bg-slate-900/50 border border-slate-800 hover:border-slate-600 transition-all p-3 rounded-md">
                   <div className="flex justify-between items-start mb-2">
                     <span className="text-xs font-bold text-slate-300 leading-tight">{s.title}</span>
-                    <span className="text-lg font-mono font-bold text-white leading-none">{Math.round(s.score)}%</span>
+                    <span className="text-lg font-mono font-bold text-white leading-none">{s.score}%</span>
                   </div>
                   
                   <div className="w-full bg-slate-800 h-1 mb-2 rounded-full overflow-hidden">
@@ -161,6 +168,7 @@ export default async function Home() {
                 
                 {newsList?.map((news) => {
                     const scores = (news.scenario_scores || {}) as Record<string, number>;
+                    // Фільтруємо нульові впливи
                     const impacts = Object.entries(scores).filter(([_, v]) => v !== 0);
 
                     return (
@@ -185,9 +193,10 @@ export default async function Home() {
                             </p>
                           )}
 
-                          {impacts.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-1">
-                              {impacts.map(([key, val]) => {
+                          {/* Теги з впливом */}
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {impacts.length > 0 ? (
+                              impacts.map(([key, val]) => {
                                 const label = liveScenarios.find(s => s.id === key)?.title || key;
                                 const isPos = val > 0;
                                 return (
@@ -195,9 +204,13 @@ export default async function Home() {
                                     {label} {isPos ? '↑' : '↓'}{Math.abs(val)}
                                   </span>
                                 );
-                              })}
-                            </div>
-                          )}
+                              })
+                            ) : (
+                              <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono rounded border border-slate-700 bg-slate-800 text-slate-500">
+                                NEUTRAL IMPACT / NO SCORE CHANGE
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
