@@ -1,0 +1,105 @@
+// 2. ПОВНІ СЛОВНИКИ (MERGED: OLD + CSV)
+
+const KW_KEY_FIGURES = [
+  'зеленський', 'zelensky', 'єрмак', 'yermak', 'кулеба', 'kuleba', 
+  'сибіга', 'sybiha', 'залужний', 'zaluzhnyi', 'сирський', 'syrskyi',
+  'трамп', 'trump', 'байден', 'biden', 'рубіо', 'rubio', 
+  'венс', 'vance', 'хегсет', 'hegseth', 'кушнер', 'kushner',
+  'макрон', 'macron', 'стармер', 'starmer', 'шольц', 'scholz', 
+  'мерц', 'merz', 'дуда', 'duda', 'орбан', 'orban', 
+  'фон дер ляєн', 'von der leyen', 'рютте', 'rutte',
+  'путін', 'putin', 'лавров', 'lavrov', 'пєсков', 'peskov'
+];
+
+const KW_PEREMOHA = [
+  // CSV Import
+  'деокупація', 'deoccupation', 'членство в нато', 'nato membership',
+  'членство в єс', 'eu membership', 'звільнення територій', 'territory liberation',
+  'повернення біженців', 'refugee returns', 'гарантії безпеки', 'security guarantees',
+  'іноземні інвестиції', 'foreign direct investment',
+  // Old List
+  'кордони 1991', 'borders 1991', 'вступ до нато', 'nato accession', 
+  'вступ до єс', 'eu accession', 'репарації', 'reparations', 
+  'трибунал', 'tribunal', 'демілітаризація', 'demilitarization', 
+  'розпад рф', 'collapse of russia', 'перемога', 'victory', 'звільнення', 'liberation'
+];
+
+const KW_FREEZE = [
+  // CSV Import
+  'заморожений конфлікт', 'frozen conflict', 'припинення вогню', 'ceasefire',
+  'обмежений суверенітет', 'limited sovereignty', 'відмова від нато', 'nato rejection',
+  'стратегічне терпіння', 'strategic patience', 'євроскептицизм', 'euroscepticism',
+  // Old List
+  'припинення вогню', 'ceasefire', 'лінія розмежування', 'contact line', 
+  'корейський сценарій', 'korean scenario', 'замороження конфлікту', 'frozen conflict', 
+  'мінськ-3', 'minsk-3', 'перемир\'я', 'truce', 'статус-кво', 'status quo'
+];
+
+const KW_ROTTEN = [
+  // CSV Import
+  'капітуляція', 'surrender', 'маріонетковий уряд', 'puppet government',
+  'уряд в екзилі', 'government in exile', 'втрата суверенітету', 'loss of sovereignty',
+  'русифікація', 'russification', 'гіперінфляція', 'hyperinflation',
+  'де-факто окупація', 'de facto occupation', 'невизнана анексія', 'unrecognized annexation',
+  'партизанський рух', 'partisan movement', 'пвк', 'pmcs',
+  'демографічна катастрофа', 'demographic catastrophe',
+  // Old List
+  'нейтральний статус', 'neutral status', 'визнання територій', 'recognition of territories', 
+  'відмова від нато', 'nato renunciation', 'фінляндизація', 'finlandization', 
+  'капітуляція', 'capitulation', 'поступки', 'concessions', 'диктат', 'dictate'
+];
+
+const KW_ATTRITION = [
+  // CSV Import
+  'ізраїльський сценарій', 'israeli scenario', 'оборонні інновації', 'defense innovation',
+  'захист суверенітету', 'sovereignty protection', 'оборонний експорт', 'defense export',
+  'технологічна перевага', 'technological advantage',
+  // Old List + Economy
+  'війна на виснаження', 'war of attrition', 'затяжна війна', 'long war', 
+  'мобілізація', 'mobilization', 'дефіцит бюджету', 'budget deficit', 
+  'біженці', 'refugees', 'снарядний голод', 'shell hunger', 'ресурси', 'resources',
+  'бюджет', 'податки', 'пдв', 'економіка рф', 'рубль', 'дефіцит', 
+  'витрати на війну', 'військовий збір', 'санкції', 'нафта', 'газ', 
+  'ввп', 'центробанк', 'нацбанк', 'курс', 'долар', 'export', 'grain'
+];
+
+const KW_CHAOS_RF = [
+  // Old List
+  'падіння рубля', 'ruble collapse', 'громадянська війна', 'civil war', 
+  'бунт', 'riot', 'розпад', 'disintegration', 'партизани', 'partisans', 
+  'бнр', 'bnr', 'смерть путіна', 'putin death', 'переворот', 'coup'
+];
+
+const KW_CHAOS_UA = [
+  // CSV Import
+  'хунта', 'junta', 'авторитаризм', 'authoritarianism',
+  'тінізація економіки', 'shadow economy', 'прихована окупація', 'hidden occupation',
+  'депопуляція', 'depopulation',
+  // Old List
+  'дефолт', 'default', 'майдан-3', 'maidan-3', 'корупційний скандал', 'corruption scandal', 
+  'протести', 'protests', 'політична криза', 'political crisis', 'розкол', 'schism',
+  'зрада', 'treason', 'економічний колапс', 'economic collapse'
+];
+
+const KW_GENERAL = [
+  // CSV Import
+  'нато', 'nato', 'єс', 'eu', 'біженці', 'refugees', 'корупція', 'corruption', 'відбудова', 'reconstruction',
+  // Old List
+  'зсу', 'afu', 'фронт', 'frontline', 'атака', 'attack', 'вибух', 'explosion',
+  'ракета', 'missile', 'дрон', 'drone', 'шахед', 'shahed', 'ukraine', 'україна'
+];
+
+// Об'єднуємо ВСЕ для фільтрації
+const ALL_RELEVANT_KEYWORDS = [
+  ...KW_KEY_FIGURES,
+  ...KW_PEREMOHA, ...KW_FREEZE, ...KW_ROTTEN, 
+  ...KW_ATTRITION, ...KW_CHAOS_RF, ...KW_CHAOS_UA, ...KW_GENERAL
+];
+
+// 3. МІНУС-СЛОВА
+const NEGATIVE_KEYWORDS = [
+  'погода', 'weather', 'гороскоп', 'horoscope', 'футбол', 'football', 
+  'концерт', 'concert', 'шоу-бізнес', 'show business', 'рецепт', 'recipe', 
+  'схуднення', 'weight loss', 'знаки зодіаку', 'zodiac', 'мода', 'fashion',
+  'спорт', 'sport', 'матч', 'match', 'ліга чемпіонів', 'champions league'
+];

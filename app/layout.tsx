@@ -6,19 +6,19 @@ const inter = Inter({ subsets: ["latin", "cyrillic"], variable: "--font-inter" }
 const mono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
 export const metadata: Metadata = {
-  title: "PeaceDeal Monitor | Analytics",
-  description: "Моніторинг сценаріїв завершення війни в Україні. Аналіз відкритих джерел (OSINT) на основі сценарного моделювання.",
+  title: "PeaceDeal Monitor | OSINT Analytics",
+  description: "Моніторинг сценаріїв завершення війни в Україні. Аналіз відкритих джерел на основі сценарного моделювання.",
   openGraph: {
     title: "PeaceDeal Monitor",
-    description: "Моніторинг сценаріїв завершення війни. Аналіз відкритих джерел.",
+    description: "Аналітика ймовірностей сценаріїв війни (OSINT).",
     url: "https://peace-deal-dashboard.netlify.app",
-    siteName: "PeaceDeal Analytics",
+    siteName: "PeaceDeal Monitor",
     images: [
       {
         url: '/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'PeaceDeal Analytics Dashboard',
+        alt: 'PeaceDeal Monitor Dashboard',
       },
     ],
     locale: "uk_UA",
@@ -27,7 +27,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "PeaceDeal Monitor",
-    description: "Live war scenario probability tracker.",
+    description: "OSINT War Scenarios Tracker.",
     images: ['/og-image.png'],
   },
 };

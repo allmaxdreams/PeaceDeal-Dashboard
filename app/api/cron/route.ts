@@ -7,7 +7,7 @@ import { supabase } from '@/app/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
-// 1. ДЖЕРЕЛА + ВАГИ (SOURCES)
+// --- 1. ДЖЕРЕЛА + ВАГИ (SOURCES) ---
 interface NewsSource {
   name: string;
   type: 'rss' | 'api';
@@ -34,7 +34,7 @@ const SOURCES: NewsSource[] = [
   { name: 'Global NewsAPI', type: 'api', url: 'https://newsapi.org/v2/everything', weight: 0.8 }
 ];
 
-// 2. ПОВНІ СЛОВНИКИ (MERGED: OLD + CSV)
+// --- 2. ПОВНІ СЛОВНИКИ (MERGED: OLD + CSV) ---
 
 const KW_KEY_FIGURES = [
   'зеленський', 'zelensky', 'єрмак', 'yermak', 'кулеба', 'kuleba', 
@@ -100,27 +100,18 @@ const KW_ATTRITION = [
 ];
 
 const KW_CHAOS_RF = [
-  // Old List
   'падіння рубля', 'ruble collapse', 'громадянська війна', 'civil war', 
   'бунт', 'riot', 'розпад', 'disintegration', 'партизани', 'partisans', 
   'бнр', 'bnr', 'смерть путіна', 'putin death', 'переворот', 'coup'
 ];
 
 const KW_CHAOS_UA = [
-  // CSV Import
-  'хунта', 'junta', 'авторитаризм', 'authoritarianism',
-  'тінізація економіки', 'shadow economy', 'прихована окупація', 'hidden occupation',
-  'депопуляція', 'depopulation',
-  // Old List
   'дефолт', 'default', 'майдан-3', 'maidan-3', 'корупційний скандал', 'corruption scandal', 
   'протести', 'protests', 'політична криза', 'political crisis', 'розкол', 'schism',
   'зрада', 'treason', 'економічний колапс', 'economic collapse'
 ];
 
 const KW_GENERAL = [
-  // CSV Import
-  'нато', 'nato', 'єс', 'eu', 'біженці', 'refugees', 'корупція', 'corruption', 'відбудова', 'reconstruction',
-  // Old List
   'зсу', 'afu', 'фронт', 'frontline', 'атака', 'attack', 'вибух', 'explosion',
   'ракета', 'missile', 'дрон', 'drone', 'шахед', 'shahed', 'ukraine', 'україна'
 ];
@@ -143,7 +134,25 @@ const NEGATIVE_KEYWORDS = [
 const parser = new Parser();
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// --- FULL TEXT PARSER (Cheerio) ---
+// --- HELPERS ---
+
+function isRelevant(text: string): boolean {
+  const lowerText = text.toLowerCase();
+  if (NEGATIVE_KEYWORDS.some(word => lowerText.includes(word))) return false;
+  return ALL_RELEVANT_KEYWORDS.some(keyword => lowerText.includes(keyword));
+}
+
+function shuffleArray(array: any[]) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+}
+
+// --- FETCHERS ---
+
+// 1. Повний текст статті через Cheerio
 async function fetchArticleContent(url: string): Promise<string> {
   try {
     const controller = new AbortController();
@@ -160,14 +169,9 @@ async function fetchArticleContent(url: string): Promise<string> {
     const html = await res.text();
     const $ = cheerio.load(html);
 
-    // Видаляємо сміття
     $('script, style, nav, footer, header, aside, .advertisement, .comments').remove();
-
-    // Шукаємо основний текст
     let text = $('article').text() || $('.post-content').text() || $('main').text() || $('body').text();
     text = text.replace(/\s+/g, ' ').trim();
-    
-    // Обмежуємо довжину для OpenAI
     return text.slice(0, 4000);
   } catch (error) {
     console.error(`Scraping error for ${url}:`, error);
@@ -175,21 +179,7 @@ async function fetchArticleContent(url: string): Promise<string> {
   }
 }
 
-// --- HELPERS ---
-function shuffleArray(array: any[]) {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
-  }
-  return array;
-}
-
-function isRelevant(text: string): boolean {
-  const lowerText = text.toLowerCase();
-  if (NEGATIVE_KEYWORDS.some(word => lowerText.includes(word))) return false;
-  return ALL_RELEVANT_KEYWORDS.some(keyword => lowerText.includes(keyword));
-}
-
+// 2. API новин
 async function fetchNewsAPIItems() {
   const apiKey = process.env.NEWS_API_KEY;
   if (!apiKey) return [];
@@ -207,6 +197,7 @@ async function fetchNewsAPIItems() {
   } catch (error) { return []; }
 }
 
+// 3. RSS стрічки
 async function fetchRSS(source: NewsSource) {
   try {
     const feed = await parser.parseURL(source.url);
@@ -224,44 +215,51 @@ async function fetchRSS(source: NewsSource) {
 // --- MAIN CRON HANDLER ---
 export async function GET() {
   try {
-    console.log('🔄 Cron started (Full-Text + Weights + Multi-Agent)...');
+    console.log('🔄 Cron started (Full Dictionary + Multi-Agent)...');
     
-    // 1. ЗБІР (Parallel Execution)
+    // Запускаємо всі джерела паралельно
     const tasks = [...SOURCES.map(source => fetchRSS(source)), fetchNewsAPIItems()];
     const results = await Promise.all(tasks);
     const allNews = results.flat().filter(item => item && item.title);
 
-    // 2. СОРТУВАННЯ
+    // Сортуємо: нові зверху
     const sortedNews = allNews
       .sort((a, b) => new Date(b.pubDate || '').getTime() - new Date(a.pubDate || '').getTime())
-      .slice(0, 40);
+      .slice(0, 40); // Беремо топ-40 для аналізу
 
     let processedCount = 0;
 
     for (const item of sortedNews) {
-      if (processedCount >= 2) break; 
+      if (processedCount >= 2) break; // Ліміт на один запуск
       if (!item.link || !item.title) continue;
 
+      // 1. Первинний фільтр (Snippet)
       const snippetCheck = `${item.title} ${item.contentSnippet || ''}`;
       if (!isRelevant(snippetCheck)) continue;
 
+      // 2. Перевірка на дублікат
       const { data: existing } = await supabase.from('news').select('id').eq('url', item.link).single();
       if (existing) continue;
 
-      console.log(`⚡ Fetching Full Text: ${item.title}`);
+      console.log(`⚡ Analyzing: [${item.sourceName}] ${item.title}`);
       
-      let fullText = await fetchArticleContent(item.link);
-      
-      if (!fullText || fullText.length < 200) {
-        fullText = item.contentSnippet || item.title;
+      // 3. Завантаження повного тексту (для RSS)
+      let fullText = item.contentSnippet;
+      // Якщо це RSS, намагаємося дістати повний текст статті
+      if (item.sourceName && item.sourceName.includes('(RSS)')) {
+         const scrapedText = await fetchArticleContent(item.link);
+         if (scrapedText.length > 200) {
+             fullText = scrapedText;
+         }
       }
 
+      // 4. Вторинний фільтр (по повному тексту)
       if (!isRelevant(fullText)) {
         console.log('Skipped after full-text check');
         continue;
       }
 
-      // 4. АНАЛІЗ (Multi-Agent + DIME)
+      // 5. AI PROMPT (Multi-Agent Debate)
       const systemPrompt = `
         You are an advanced AI simulation engine (Multi-Agent Debate).
         Analyze the provided FULL TEXT of the article.
@@ -290,12 +288,13 @@ export async function GET() {
       const aiResponse = JSON.parse(completion.choices[0].message.content || "{}");
       let scores = aiResponse.scores || { peremoha:0, zamorozhennya:0, gnyla_ugoda:0, visnazhennya:0, chaos_rf:0, chaos_ua:0 };
 
-      // 5. ВАГИ (WEIGHTING)
+      // 6. Застосування ваги джерела
       const weight = item.weight || 0.8; 
       for (const key in scores) {
         scores[key] = Math.round(scores[key] * weight);
       }
 
+      // 7. Збереження
       await supabase.from('news').insert([{
         date: new Date().toISOString(),
         source: `${item.sourceName}`,
