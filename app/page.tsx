@@ -46,95 +46,88 @@ export default async function Home() {
     score: currentScores[s.id as keyof typeof currentScores] || 0
   }));
 
-  // Функція для кольору дельти (зміни)
-  const getDeltaColor = (score: number) => {
-      if (score === 0) return 'text-slate-500';
-      return score > 0 ? 'text-emerald-400' : 'text-rose-400';
-  };
-
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-300 p-4 md:p-6 font-sans">
-      <div className="max-w-[1600px] mx-auto">
-        
-        {/* TOP BAR */}
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 border-b border-slate-800 pb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-100 tracking-tight flex items-center gap-2">
-              <span className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse"></span>
-              PEACEDEAL <span className="font-mono text-slate-500 font-normal">/// ANALYTICS</span>
+    <main className="min-h-screen bg-[#0b1120] text-slate-300 font-sans">
+      {/* Top Navigation Bar */}
+      <nav className="border-b border-slate-800 bg-[#0f172a]/80 backdrop-blur-md sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.6)]"></div>
+            <h1 className="text-lg font-bold text-slate-100 tracking-tight font-mono">
+              PEACEDEAL<span className="text-slate-600">.AI</span>
             </h1>
-            <p className="text-sm text-slate-500 mt-1 font-mono">
-              AI-POWERED GEOPOLITICAL FORECASTING SYSTEM
-            </p>
           </div>
-          <div className="mt-4 md:mt-0 flex gap-4 text-xs font-mono text-slate-500">
-            <div className="px-3 py-1 bg-slate-900 border border-slate-800 rounded">
-              SOURCE: MULTI-VECTOR RSS/API
+          <div className="flex gap-4 text-[10px] font-mono text-slate-500">
+            <div className="hidden sm:block px-2 py-1 bg-slate-900 rounded border border-slate-800">
+              EVENTS: {newsList?.length || 0}
             </div>
-            <div className="px-3 py-1 bg-slate-900 border border-slate-800 rounded">
-              MODEL: PEKAR-DIME-V2
-            </div>
-            <div className="px-3 py-1 bg-slate-900 border border-slate-800 rounded text-emerald-500">
-              STATUS: ONLINE
+            <div className="px-2 py-1 bg-slate-900 rounded border border-slate-800 text-emerald-500">
+              SYS: ONLINE
             </div>
           </div>
-        </header>
+        </div>
+      </nav>
 
-        {/* DASHBOARD GRID */}
+      <div className="max-w-7xl mx-auto p-4 lg:p-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
-          {/* LEFT COLUMN: SCENARIOS (4 cols) */}
-          <div className="lg:col-span-4 space-y-4">
-            <div className="flex justify-between items-center mb-2">
-               <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest font-mono">Probability Matrix</h2>
-            </div>
+          {/* LEFT COLUMN: SCENARIOS (Compact Matrix) */}
+          <div className="lg:col-span-4 space-y-3">
+            <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest font-mono mb-2">
+              Probability Matrix
+            </h2>
             
-            {liveScenarios.map((s) => (
-              <div key={s.id} className="group relative bg-slate-900 border border-slate-800 hover:border-slate-600 transition-colors p-4 rounded-sm">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm font-bold text-slate-200">{s.title}</span>
-                  <span className="text-2xl font-mono font-bold text-white">{s.score}%</span>
+            {/* Grid for Mobile (2 columns), Stack for Desktop */}
+            <div className="grid grid-cols-2 lg:grid-cols-1 gap-3">
+              {liveScenarios.map((s) => (
+                <div key={s.id} className="group bg-slate-900/50 border border-slate-800 hover:border-slate-600 transition-all p-3 rounded-md">
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="text-xs font-bold text-slate-300 leading-tight">{s.title}</span>
+                    <span className="text-lg font-mono font-bold text-white leading-none">{s.score}%</span>
+                  </div>
+                  
+                  {/* Slim Progress Bar */}
+                  <div className="w-full bg-slate-800 h-1 mb-2 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full transition-all duration-1000"
+                      style={{ 
+                        width: `${s.score}%`,
+                        backgroundColor: s.id === 'peremoha' ? '#4ade80' : 
+                                       s.id === 'chaos_rf' ? '#f87171' : 
+                                       s.id === 'zamorozhennya' ? '#3b82f6' : '#94a3b8' 
+                      }}
+                    ></div>
+                  </div>
+                  
+                  {/* Description truncated for compactness */}
+                  <p className="text-[10px] text-slate-600 line-clamp-2 leading-relaxed">
+                    {s.description}
+                  </p>
                 </div>
-                
-                {/* Progress Bar */}
-                <div className="w-full bg-slate-800 h-1 mb-3 overflow-hidden">
-                  <div 
-                    className={`h-full transition-all duration-1000 ${s.score > 0 ? 'opacity-100' : 'opacity-0'}`} 
-                    style={{ 
-                      width: `${s.score}%`,
-                      backgroundColor: s.id === 'peremoha' ? '#4ade80' : 
-                                     s.id === 'chaos_rf' ? '#f87171' : '#94a3b8' 
-                    }}
-                  ></div>
-                </div>
-
-                <p className="text-xs text-slate-500 leading-relaxed border-l-2 border-slate-800 pl-2 group-hover:border-slate-600 transition-colors">
-                  {s.description}
-                </p>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
 
-          {/* RIGHT COLUMN: CHART & FEED (8 cols) */}
+          {/* RIGHT COLUMN: ANALYTICS (Chart + Feed) */}
           <div className="lg:col-span-8 space-y-6">
             
-            {/* CHART */}
-            <section>
+            {/* CHART SECTION */}
+            <section className="bg-slate-900/50 border border-slate-800 rounded-lg p-1">
                <ScenarioChart data={chartData} />
             </section>
 
-            {/* NEWS FEED */}
+            {/* FEED SECTION */}
             <section>
-              <div className="flex justify-between items-center mb-4 border-b border-slate-800 pb-2">
-                <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest font-mono">
+              <div className="flex justify-between items-end mb-3 border-b border-slate-800 pb-2">
+                <h2 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest font-mono">
                   Intelligence Feed
                 </h2>
-                <span className="text-xs font-mono text-slate-600">LAST 24 HOURS</span>
+                <span className="text-[10px] font-mono text-slate-600">LIVE</span>
               </div>
 
-              <div className="space-y-0 divide-y divide-slate-800 border border-slate-800 rounded-sm bg-slate-900">
+              <div className="space-y-3">
                 {(!newsList || newsList.length === 0) && (
-                  <p className="p-6 text-center text-slate-600 font-mono text-sm">Waiting for data stream...</p>
+                  <p className="text-center text-slate-600 font-mono text-xs py-8">Initializing data stream...</p>
                 )}
                 
                 {newsList?.map((news) => {
@@ -142,40 +135,42 @@ export default async function Home() {
                     const impacts = Object.entries(scores).filter(([_, v]) => v !== 0);
 
                     return (
-                      <div key={news.id} className="p-4 hover:bg-slate-800/50 transition-colors group">
-                        <div className="flex flex-wrap items-center gap-3 text-[10px] font-mono text-slate-500 mb-1">
-                          <span className="text-emerald-500">[{news.source}]</span>
-                          <span>{new Date(news.created_at).toLocaleString('uk-UA', { day: '2-digit', month: '2-digit', hour: '2-digit', minute:'2-digit'})}</span>
-                          <span className="text-slate-600">ID: {news.id}</span>
+                      <div key={news.id} className="p-3 md:p-4 bg-[#0f172a] border border-slate-800 rounded hover:border-slate-700 transition-colors">
+                        <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-slate-500 mb-1">
+                          <span className="text-emerald-500 px-1.5 py-0.5 bg-emerald-500/10 rounded">
+                            {news.source.replace('(RSS)', '').replace('NewsAPI', '').trim()}
+                          </span>
+                          <span>{new Date(news.created_at).toLocaleString('uk-UA', { month: 'numeric', day: 'numeric', hour: '2-digit', minute:'2-digit'})}</span>
                         </div>
                         
-                        <div className="flex flex-col md:flex-row gap-4">
-                          <div className="flex-1">
-                            <h3 className="text-md font-bold text-slate-200 mb-2 group-hover:text-blue-400 transition-colors">
-                              <a href={news.url} target="_blank" rel="noopener noreferrer">
-                                {news.title}
-                              </a>
-                            </h3>
-                            <p className="text-sm text-slate-400 leading-relaxed font-light">
+                        <div className="flex flex-col gap-2">
+                          <h3 className="text-sm font-semibold text-slate-200 leading-snug hover:text-blue-400 transition-colors">
+                            <a href={news.url} target="_blank" rel="noopener noreferrer">
+                              {news.title}
+                            </a>
+                          </h3>
+                          
+                          {/* Summary - only show if exists */}
+                          {news.summary && (
+                            <p className="text-xs text-slate-400 font-light border-l-2 border-slate-700 pl-2">
                               {news.summary}
                             </p>
-                          </div>
+                          )}
 
-                          {/* Impact Tags */}
-                          <div className="w-full md:w-48 flex flex-wrap content-start gap-1">
-                            {impacts.map(([key, val]) => {
-                              const label = liveScenarios.find(s => s.id === key)?.title || key;
-                              const isPos = val > 0;
-                              return (
-                                <div key={key} className="w-full flex justify-between items-center px-2 py-1 bg-slate-950 border border-slate-800 text-[10px] font-mono rounded-sm">
-                                  <span className="text-slate-400 truncate max-w-[100px]">{label}</span>
-                                  <span className={isPos ? 'text-emerald-400' : 'text-rose-400'}>
-                                    {isPos ? '+' : ''}{val}
+                          {/* Compact Impact Tags */}
+                          {impacts.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {impacts.map(([key, val]) => {
+                                const label = liveScenarios.find(s => s.id === key)?.title || key;
+                                const isPos = val > 0;
+                                return (
+                                  <span key={key} className={`inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono rounded border ${isPos ? 'border-emerald-900/50 bg-emerald-900/10 text-emerald-400' : 'border-rose-900/50 bg-rose-900/10 text-rose-400'}`}>
+                                    {label} {isPos ? '↑' : '↓'}{Math.abs(val)}
                                   </span>
-                                </div>
-                              );
-                            })}
-                          </div>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       </div>
                     );

@@ -10,12 +10,12 @@ type ChartProps = {
 };
 
 const COLORS = {
-  peremoha: '#16a34a',
-  zamorozhennya: '#2563eb',
-  gnyla_ugoda: '#ca8a04',
-  visnazhennya: '#4b5563',
-  chaos_rf: '#dc2626',
-  chaos_ua: '#ea580c',
+  peremoha: '#4ade80',
+  zamorozhennya: '#3b82f6',
+  gnyla_ugoda: '#facc15',
+  visnazhennya: '#94a3b8',
+  chaos_rf: '#f87171',
+  chaos_ua: '#fb923c',
 };
 
 const NAMES = {
@@ -35,54 +35,74 @@ export default function ScenarioChart({ data }: ChartProps) {
   }, []);
 
   if (!isMounted) {
-    return <div className="w-full h-[320px] bg-slate-50 rounded-xl animate-pulse"></div>;
+    return <div className="w-full h-[300px] bg-slate-900/50 rounded-lg animate-pulse"></div>;
   }
 
   if (!data || data.length === 0) {
     return (
-      <div className="w-full h-[320px] flex items-center justify-center bg-white rounded-xl border text-slate-400">
-        Графік очікує даних...
+      <div className="w-full h-[300px] flex items-center justify-center text-slate-600 font-mono text-xs">
+        WAITING FOR DATA...
       </div>
     );
   }
 
   return (
-    <div className="w-full h-[400px] bg-white p-2 md:p-4 rounded-xl shadow-md border border-slate-200">
-      <h3 className="text-lg font-bold text-slate-700 mb-4 ml-2">Тренд ймовірностей</h3>
+    <div className="w-full h-[300px] p-2">
+      <div className="flex justify-between items-center px-2 mb-2">
+        <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest font-mono">
+          Trend (72h)
+        </h3>
+      </div>
       
-      <div style={{ width: '100%', height: '320px' }}>
+      <div style={{ width: '100%', height: '260px' }}>
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+          <LineChart data={data} margin={{ top: 5, right: 10, left: -25, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
             <XAxis 
               dataKey="date" 
-              tick={{ fontSize: 10 }}
+              tick={{ fontSize: 9, fill: '#475569', fontFamily: 'var(--font-mono)' }}
+              axisLine={false}
+              tickLine={false}
               tickFormatter={(str) => {
                 try {
                   const date = new Date(str);
-                  return `${date.getDate()}.${date.getMonth() + 1}`;
+                  return `${date.getDate()}/${date.getMonth() + 1}`;
                 } catch (e) { return ''; }
               }}
             />
-            <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+            <YAxis 
+              domain={[0, 100]} 
+              tick={{ fontSize: 9, fill: '#475569', fontFamily: 'var(--font-mono)' }} 
+              axisLine={false}
+              tickLine={false}
+            />
             <Tooltip 
+              contentStyle={{ 
+                backgroundColor: '#0f172a', 
+                border: '1px solid #1e293b', 
+                borderRadius: '4px',
+                color: '#f1f5f9',
+                fontSize: '11px',
+                fontFamily: 'var(--font-mono)',
+                padding: '8px'
+              }}
+              labelStyle={{ color: '#64748b', marginBottom: '4px' }}
               labelFormatter={(label) => {
                 try { return new Date(label).toLocaleString('uk-UA'); } catch (e) { return label; }
               }}
-              contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
             />
-            <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
+            <Legend iconSize={8} wrapperStyle={{ paddingTop: '10px', fontSize: '10px', fontFamily: 'var(--font-mono)' }} />
             
             {Object.entries(COLORS).map(([key, color]) => (
               <Line
                 key={key}
-                type="monotone"
+                type="stepAfter" // Технічний стиль ліній
                 dataKey={key}
                 name={NAMES[key as keyof typeof NAMES]}
                 stroke={color}
-                strokeWidth={2}
-                dot={data.length < 15}
-                activeDot={{ r: 6 }}
+                strokeWidth={1.5}
+                dot={false}
+                activeDot={{ r: 3, stroke: '#fff', strokeWidth: 1 }}
                 isAnimationActive={false}
               />
             ))}
